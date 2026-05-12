@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GPS Enabled Cadastral Map</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Font Awesome for GPS Icon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        #map { height: 100vh; width: 100%; }
+        body { margin: 0; padding: 0; }
+        
+        /* GPS Button Style */
+        .gps-button {
+            background-color: white;
+            border: 2px solid rgba(0,0,0,0.2);
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 18px;
+            color: #333;
+        }
+        .gps-button:hover { background-color: #f4f4f4; color: #007bff; }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script>
+    // 1. Base Maps
+    var googleRoads = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'], attribution: 'Google'
+    });
+
+    var googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+        maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'], attribution: 'Google Hybrid'
+    });
+
+    // 2. Bhuvan Cadastral WMS Layer
+    var cadastralLayer = L.tileLayer.wms('https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms', {
+        layers: 'v3:cadastral',
+        format: 'image/png',
+        transparent: true,
+        version: '1.1.1',
+        attribution: 'NRSC/Bhuvan'
+    });
+
+    // 3. Initialize Map
+    var map = L.map('map', {
+        center: [11.196, 76.227],
+        zoom: 14,
+        layers: [googleHybrid, cadastralLayer]
+    });
+
+    // 4. Layer Control
+    var baseMaps = { "Road Map": googleRoads, "Satellite Hybrid": googleHybrid };
+    var overlayMaps = { "Cadastral Layer": cadastralLayer };
+    L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+    // 5. GPS Functionality
+    var locationMarker, locationCircle;
+
+    function findMyLocation() {
+        map.locate({setView: true, maxZoom: 18});
+    }
+
+    map.on('locationfound', function(e) {
+        if (locationMarker) { map.removeLayer(locationMarker); }
+        if (locationCircle) { map.removeLayer(locationCircle); }
+
+        locationMarker = L.marker(e.latlng).addTo(map).bindPopup("Ningalude Location").openPopup();
+        locationCircle = L.circle(e.latlng, e.accuracy / 2).addTo(map);
+    });
+
+    map.on('locationerror', function(e) {
+        alert("GPS Location access denied or not found.");
+    });
+
+    // 6. Custom GPS Button (Icon)
+    var customControl = L.Control.extend({
+        options: { position: 'topleft' },
+        onAdd: function (map) {
+            var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            var button = L.DomUtil.create('a', 'gps-button', container);
+            button.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i>';
+            button.title = "Find My Location";
+
+            L.DomEvent.on(button, 'click', function (e) {
+                L.DomEvent.stopPropagation(e);
+                findMyLocation();
+            });
+
+            return container;
+        }
+    });
+
+    map.addControl(new customControl());
+
+</script>
+</body>
+</html>
