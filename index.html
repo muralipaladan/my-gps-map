@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Live GPS Tracker with Drawing & KML</title>
+    <title>Live GPS Tracker - Cadastral Map</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
@@ -24,17 +24,10 @@
         body { margin: 0; padding: 0; font-family: sans-serif; }
         
         .control-panel {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            z-index: 1000;
-            background: white;
-            padding: 10px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+            position: absolute; bottom: 20px; left: 20px; z-index: 1000;
+            background: white; padding: 10px; border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3); display: flex;
+            flex-direction: column; gap: 10px;
         }
 
         .gps-button {
@@ -71,6 +64,10 @@
 
 <script>
     // 1. Base Maps
+    var osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    });
+
     var googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
         maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3']
     });
@@ -84,129 +81,99 @@
         layers: 'v3:cadastral', format: 'image/png', transparent: true, version: '1.1.1'
     });
 
+    // 3. Initialize Map (Default with OSM and Cadastral)
     var map = L.map('map', {
         center: [11.196, 76.227],
         zoom: 14,
-        layers: [googleHybrid, cadastralLayer]
+        layers: [osmStandard, cadastralLayer]
     });
 
-    L.control.layers({ "Satellite": googleHybrid, "Road": googleRoads }, { "Cadastral": cadastralLayer }).addTo(map);
+    // Layer Controls
+    var baseMaps = {
+        "OSM Standard": osmStandard,
+        "Google Hybrid": googleHybrid,
+        "Google Road": googleRoads
+    };
+    
+    var overlayMaps = {
+        "Cadastral (NRSC)": cadastralLayer
+    };
 
-    // 3. Drawing Tools
+    L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+    // 4. Drawing Tools
     var drawnItems = new L.FeatureGroup();
     map.addLayer(drawnItems);
 
     var drawControl = new L.Control.Draw({
         edit: { featureGroup: drawnItems },
-        draw: {
-            polygon: true,
-            polyline: true,
-            rectangle: true,
-            circle: false,
-            marker: true,
-            circlemarker: false
-        }
+        draw: { polygon: true, polyline: true, rectangle: true, circle: false, marker: true }
     });
     map.addControl(drawControl);
 
     map.on(L.Draw.Event.CREATED, function (event) {
-        var layer = event.layer;
-        drawnItems.addLayer(layer);
+        drawnItems.addLayer(event.layer);
     });
 
-    // 4. KML Download Function
+    // 5. KML Download
     function downloadKML() {
         if (drawnItems.getLayers().length === 0) {
-            alert("Download cheyyaan line-ukal onnum draw cheythittilla!");
-            return;
+            alert("Line draw cheythittilla!"); return;
         }
-
-        var kml = '<?xml version="1.0" encoding="UTF-8"?>' +
-                  '<kml xmlns="http://www.opengis.net/kml/2.2">' +
-                  '<Document>';
-        
+        var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>';
         drawnItems.eachLayer(function(layer) {
-            if (layer instanceof L.Polyline) {
+            if (layer instanceof L.Polyline || layer instanceof L.Polygon) {
                 kml += '<Placemark><LineString><coordinates>';
-                var latlngs = layer.getLatLngs();
-                latlngs.forEach(function(ll) {
-                    kml += ll.lng + ',' + ll.lat + ',0 ';
-                });
+                layer.getLatLngs().flat().forEach(ll => kml += ll.lng + ',' + ll.lat + ',0 ');
                 kml += '</coordinates></LineString></Placemark>';
-            } else if (layer instanceof L.Polygon) {
-                kml += '<Placemark><Polygon><outerBoundaryIs><LinearRing><coordinates>';
-                var latlngs = layer.getLatLngs()[0];
-                latlngs.forEach(function(ll) {
-                    kml += ll.lng + ',' + ll.lat + ',0 ';
-                });
-                // Close the polygon
-                kml += latlngs[0].lng + ',' + latlngs[0].lat + ',0 ';
-                kml += '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>';
-            } else if (layer instanceof L.Marker) {
-                kml += '<Placemark><Point><coordinates>' + layer.getLatLng().lng + ',' + layer.getLatLng().lat + ',0</coordinates></Point></Placemark>';
             }
         });
-
         kml += '</Document></kml>';
-
         var blob = new Blob([kml], {type: "application/vnd.google-earth.kml+xml"});
-        var url = URL.createObjectURL(blob);
         var a = document.createElement("a");
-        a.href = url;
-        a.download = "map_data.kml";
+        a.href = URL.createObjectURL(blob);
+        a.download = "drawings.kml";
         a.click();
     }
 
-    // 5. KML Upload Function
+    // 6. KML Upload
     document.getElementById('uploadKML').addEventListener('change', function(e) {
         var file = e.target.files[0];
         if (!file) return;
-
         var reader = new FileReader();
         reader.onload = function(event) {
-            var kmlText = event.target.result;
-            var runLayer = omnivore.kml.parse(kmlText);
-            runLayer.addTo(map);
-            map.fitBounds(runLayer.getBounds());
+            omnivore.kml.parse(event.target.result).addTo(map);
         };
         reader.readAsText(file);
     });
 
-    // 6. Live GPS Button
-    var locationMarker, locationCircle, isTracking = false;
-
+    // 7. GPS Control
+    var locationMarker, isTracking = false;
     var gpsControl = L.Control.extend({
         options: { position: 'topleft' },
         onAdd: function (map) {
-            var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-            var button = L.DomUtil.create('a', 'gps-button', container);
-            button.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i>';
-            
-            L.DomEvent.on(button, 'click', function (e) {
+            var btn = L.DomUtil.create('a', 'gps-button leaflet-bar leaflet-control');
+            btn.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i>';
+            L.DomEvent.on(btn, 'click', function (e) {
                 L.DomEvent.stopPropagation(e);
                 if (!isTracking) {
-                    map.locate({ setView: true, maxZoom: 18, watch: true, enableHighAccuracy: true });
-                    button.classList.add('active-gps');
+                    map.locate({ setView: true, watch: true, enableHighAccuracy: true });
+                    btn.classList.add('active-gps');
                     isTracking = true;
                 } else {
                     map.stopLocate();
-                    button.classList.remove('active-gps');
+                    btn.classList.remove('active-gps');
                     isTracking = false;
                 }
             });
-            return container;
+            return btn;
         }
     });
     map.addControl(new gpsControl());
 
     map.on('locationfound', function(e) {
-        if (!locationMarker) {
-            locationMarker = L.marker(e.latlng).addTo(map);
-            locationCircle = L.circle(e.latlng, e.accuracy / 2).addTo(map);
-        } else {
-            locationMarker.setLatLng(e.latlng);
-            locationCircle.setLatLng(e.latlng).setRadius(e.accuracy / 2);
-        }
+        if (!locationMarker) locationMarker = L.marker(e.latlng).addTo(map);
+        else locationMarker.setLatLng(e.latlng);
     });
 
 </script>
