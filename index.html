@@ -3,7 +3,7 @@
 <head>
     <title>GPS Tracker - Murali's GIS Map</title>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
     <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -20,21 +20,37 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <style>
-        #map { height: 100vh; width: 100%; }
-        body { margin: 0; padding: 0; font-family: sans-serif; }
+        #map { height: 100vh; width: 100%; position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
+        body { margin: 0; padding: 0; font-family: sans-serif; overflow: hidden; }
         
-        /* Village Boundary Style - Thick & Bold Line Effect */
+        /* Village Boundary Style */
         .village-style {
             filter: contrast(500%) brightness(40%) saturate(10) blur(0.2px) hue-rotate(320deg) !important;
             opacity: 1;
         }
 
-        .control-panel {
-            position: absolute; bottom: 30px; left: 10px; z-index: 1000;
-            background: white; padding: 12px; border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3); display: flex;
-            flex-direction: column; gap: 10px;
+        /* Controls - Default Hidden */
+        .leaflet-control-layers, .leaflet-draw {
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            pointer-events: none;
         }
+
+        /* Show on map interaction */
+        .show-controls .leaflet-control-layers, 
+        .show-controls .leaflet-draw {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .control-panel {
+            position: absolute; bottom: 10px; left: 10px; z-index: 1000;
+            background: rgba(255, 255, 255, 0.8); padding: 5px; border-radius: 8px;
+            display: flex; flex-direction: row; gap: 5px;
+            opacity: 0; transition: opacity 0.5s;
+        }
+
+        .show-controls .control-panel { opacity: 1; }
 
         .gps-button {
             background-color: white; border: 2px solid rgba(0,0,0,0.2);
@@ -42,20 +58,12 @@
             font-size: 18px; color: #333; text-align: center;
             display: block; width: 34px; height: 34px; line-height: 34px;
         }
-        .active-gps { color: #28a745; border-color: #28a745; box-shadow: 0 0 5px #28a745; }
+        .active-gps { color: #28a745; border-color: #28a745; }
         
-        .btn {
+        .btn, .file-label {
             background: #007bff; color: white; border: none;
-            padding: 10px 15px; border-radius: 4px; cursor: pointer;
-            font-size: 14px; text-align: center; font-weight: bold;
-        }
-        .btn:hover { background: #0056b3; }
-        
-        input[type="file"] { display: none; }
-        .file-label {
-            background: #6c757d; color: white; padding: 10px 15px;
-            border-radius: 4px; cursor: pointer; font-size: 14px; 
-            text-align: center; font-weight: bold;
+            padding: 8px 10px; border-radius: 4px; cursor: pointer;
+            font-size: 12px; text-align: center; font-weight: bold;
         }
     </style>
 </head>
@@ -63,140 +71,84 @@
 
 <div id="map"></div>
 
-<div class="control-panel">
-    <button class="btn" onclick="downloadKML()"><i class="fa-solid fa-download"></i> Save KML</button>
+<div class="control-panel" id="bottomPanel">
+    <button class="btn" onclick="downloadKML()"><i class="fa-solid fa-download"></i> Save</button>
     <label class="file-label">
-        <i class="fa-solid fa-upload"></i> Upload KML <input type="file" id="uploadKML" accept=".kml">
+        <i class="fa-solid fa-upload"></i> Load <input type="file" id="uploadKML" accept=".kml">
     </label>
 </div>
 
 <script>
-    // 1. BASE MAP LAYERS[cite: 1]
-    var osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-    });
+    // 1. BASE MAP LAYERS
+    var osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+    var googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'] });
+    var googleRoads = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'] });
 
-    var googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-        maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'],
-        attribution: '© Google Hybrid'
-    });
-
-    var googleRoads = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-        maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'],
-        attribution: '© Google Roads'
-    });
-
-    // 2. BHUVAN WMS LAYERS[cite: 1]
+    // 2. BHUVAN LAYERS
     var bhuvanURL = 'https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms';
-
-    var villageLayer = L.tileLayer.wms(bhuvanURL, {
-        layers: 'v3:village',
-        format: 'image/png',
-        transparent: true,
-        version: '1.1.1',
-        opacity: 1.0,
-        className: 'village-style'
-    });
-
-    var cadastralLayer = L.tileLayer.wms(bhuvanURL, {
-        layers: 'v3:cadastral',
-        format: 'image/png',
-        transparent: true,
-        version: '1.1.1',
-        opacity: 0.9
-    });
+    var villageLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:village', format: 'image/png', transparent: true, className: 'village-style' });
+    var cadastralLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:cadastral', format: 'image/png', transparent: true });
 
     // 3. INITIALIZE MAP[cite: 1]
     var map = L.map('map', {
-        center: [11.196, 76.227], 
-        zoom: 14,
-        layers: [googleHybrid, villageLayer] 
+        center: [11.196, 76.227], zoom: 14,
+        layers: [googleHybrid, villageLayer],
+        zoomControl: false // Manual hidden
     });
 
-    // LAYER CONTROL
-    var baseMaps = {
-        "Google Hybrid": googleHybrid,
-        "Google Road Map": googleRoads,
-        "OSM Standard": osmStandard
-    };
-    
-    var overlayMaps = {
-        "Village Boundary": villageLayer,
-        "Cadastral (Survey No)": cadastralLayer
-    };
+    // Toggle controls on touch
+    map.on('click', function() {
+        document.body.classList.toggle('show-controls');
+    });
 
-    L.control.layers(baseMaps, overlayMaps, {collapsed: false}).addTo(map);
+    var baseMaps = { "Hybrid": googleHybrid, "Road": googleRoads, "OSM": osmStandard };
+    var overlayMaps = { "Village": villageLayer, "Cadastral": cadastralLayer };
 
-    // 4. DRAWING TOOLS[cite: 1]
+    L.control.layers(baseMaps, overlayMaps, {collapsed: true}).addTo(map);
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    // 4. DRAWING[cite: 1]
     var drawnItems = new L.FeatureGroup();
     map.addLayer(drawnItems);
-
     var drawControl = new L.Control.Draw({
         edit: { featureGroup: drawnItems },
-        draw: {
-            polygon: { shapeOptions: { color: '#ff0000' } },
-            polyline: { shapeOptions: { color: '#0000ff' } },
-            rectangle: true,
-            circle: false,
-            marker: true
-        }
+        draw: { polygon: true, polyline: true, rectangle: true, marker: true, circle: false }
     });
     map.addControl(drawControl);
+    map.on(L.Draw.Event.CREATED, function (e) { drawnItems.addLayer(e.layer); });
 
-    map.on(L.Draw.Event.CREATED, function (event) {
-        drawnItems.addLayer(event.layer);
-    });
-
-    // 5. KML DOWNLOAD LOGIC[cite: 1]
+    // 5. KML LOGIC[cite: 1]
     function downloadKML() {
-        if (drawnItems.getLayers().length === 0) {
-            alert("Line-o polygon-o draw cheyyuka."); return;
-        }
+        if (drawnItems.getLayers().length === 0) return alert("Draw something first!");
         var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>';
         drawnItems.eachLayer(function(layer) {
-            if (layer instanceof L.Marker) {
-                kml += '<Placemark><Point><coordinates>' + layer.getLatLng().lng + ',' + layer.getLatLng().lat + ',0</coordinates></Point></Placemark>';
-            } else {
-                kml += '<Placemark><LineString><coordinates>';
-                var coords = layer.getLatLngs();
-                if (Array.isArray(coords[0])) coords = coords[0];
-                coords.forEach(ll => kml += ll.lng + ',' + ll.lat + ',0 ');
-                kml += '</coordinates></LineString></Placemark>';
-            }
+            kml += '<Placemark><LineString><coordinates>';
+            var coords = layer.getLatLngs ? (Array.isArray(layer.getLatLngs()[0]) ? layer.getLatLngs()[0] : layer.getLatLngs()) : [layer.getLatLng()];
+            coords.forEach(ll => kml += (ll.lng || ll.lng) + ',' + (ll.lat || ll.lat) + ',0 ');
+            kml += '</coordinates></LineString></Placemark>';
         });
         kml += '</Document></kml>';
-        var blob = new Blob([kml], {type: "application/vnd.google-earth.kml+xml"});
         var a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "Survey_Drawings.kml";
-        a.click();
+        a.href = URL.createObjectURL(new Blob([kml], {type: "application/vnd.google-earth.kml+xml"}));
+        a.download = "Map.kml"; a.click();
     }
 
-    // 6. KML UPLOAD LOGIC[cite: 1]
     document.getElementById('uploadKML').addEventListener('change', function(e) {
-        var file = e.target.files[0];
-        if (!file) return;
         var reader = new FileReader();
         reader.onload = function(event) {
-            var customLayer = omnivore.kml.parse(event.target.result);
-            customLayer.addTo(map);
-            customLayer.on('ready', function() {
-                map.fitBounds(customLayer.getBounds());
-            });
+            var l = omnivore.kml.parse(event.target.result).addTo(map);
+            l.on('ready', function() { map.fitBounds(l.getBounds()); });
         };
-        reader.readAsText(file);
+        reader.readAsText(e.target.files[0]);
     });
 
-    // 7. LIVE GPS TRACKING[cite: 1]
-    var locationMarker, locationCircle, isTracking = false;
-
+    // 6. GPS[cite: 1]
+    var locationMarker, isTracking = false;
     var gpsControl = L.Control.extend({
         options: { position: 'topleft' },
         onAdd: function (map) {
             var btn = L.DomUtil.create('a', 'gps-button leaflet-bar leaflet-control');
             btn.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i>';
-            btn.title = "Live GPS Tracking";
-            
             L.DomEvent.on(btn, 'click', function (e) {
                 L.DomEvent.stopPropagation(e);
                 if (!isTracking) {
@@ -213,17 +165,10 @@
         }
     });
     map.addControl(new gpsControl());
-
     map.on('locationfound', function(e) {
-        if (!locationMarker) {
-            locationMarker = L.marker(e.latlng).addTo(map).bindPopup("You are here").openPopup();
-            locationCircle = L.circle(e.latlng, e.accuracy / 2).addTo(map);
-        } else {
-            locationMarker.setLatLng(e.latlng);
-            locationCircle.setLatLng(e.latlng).setRadius(e.accuracy / 2);
-        }
+        if (!locationMarker) locationMarker = L.marker(e.latlng).addTo(map);
+        else locationMarker.setLatLng(e.latlng);
     });
-
 </script>
 </body>
 </html>
