@@ -1,1 +1,1 @@
-https://github.com/muralipaladan/my-gps-map
+https://muralipaladan.github.io/my-gps-map/
