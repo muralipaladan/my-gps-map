@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Live GPS Tracker - Cadastral Map</title>
+    <title>GPS Tracker - Murali's GIS Map</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
@@ -9,11 +9,11 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
-    <!-- Leaflet Draw CSS & JS -->
+    <!-- Leaflet Draw -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     
-    <!-- Omnivore for KML Upload -->
+    <!-- Omnivore for KML -->
     <script src="https://unpkg.com/@mapbox/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
     
     <!-- Font Awesome -->
@@ -23,9 +23,15 @@
         #map { height: 100vh; width: 100%; }
         body { margin: 0; padding: 0; font-family: sans-serif; }
         
+        /* Village Boundary Style - Thick & Bold Line Effect */
+        .village-style {
+            filter: contrast(500%) brightness(40%) saturate(10) blur(0.2px) hue-rotate(320deg) !important;
+            opacity: 1;
+        }
+
         .control-panel {
-            position: absolute; bottom: 20px; left: 20px; z-index: 1000;
-            background: white; padding: 10px; border-radius: 8px;
+            position: absolute; bottom: 30px; left: 10px; z-index: 1000;
+            background: white; padding: 12px; border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.3); display: flex;
             flex-direction: column; gap: 10px;
         }
@@ -34,20 +40,22 @@
             background-color: white; border: 2px solid rgba(0,0,0,0.2);
             border-radius: 4px; padding: 8px; cursor: pointer;
             font-size: 18px; color: #333; text-align: center;
+            display: block; width: 34px; height: 34px; line-height: 34px;
         }
-        .active-gps { color: #28a745; border-color: #28a745; }
+        .active-gps { color: #28a745; border-color: #28a745; box-shadow: 0 0 5px #28a745; }
         
         .btn {
             background: #007bff; color: white; border: none;
-            padding: 8px 12px; border-radius: 4px; cursor: pointer;
-            font-size: 14px; text-align: center;
+            padding: 10px 15px; border-radius: 4px; cursor: pointer;
+            font-size: 14px; text-align: center; font-weight: bold;
         }
         .btn:hover { background: #0056b3; }
         
         input[type="file"] { display: none; }
         .file-label {
-            background: #6c757d; color: white; padding: 8px 12px;
-            border-radius: 4px; cursor: pointer; font-size: 14px; text-align: center;
+            background: #6c757d; color: white; padding: 10px 15px;
+            border-radius: 4px; cursor: pointer; font-size: 14px; 
+            text-align: center; font-weight: bold;
         }
     </style>
 </head>
@@ -56,58 +64,82 @@
 <div id="map"></div>
 
 <div class="control-panel">
-    <button class="btn" onclick="downloadKML()">Download KML</button>
+    <button class="btn" onclick="downloadKML()"><i class="fa-solid fa-download"></i> Save KML</button>
     <label class="file-label">
-        Upload KML <input type="file" id="uploadKML" accept=".kml">
+        <i class="fa-solid fa-upload"></i> Upload KML <input type="file" id="uploadKML" accept=".kml">
     </label>
 </div>
 
 <script>
-    // 1. Base Maps
+    // 1. BASE MAP LAYERS[cite: 1]
     var osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap'
     });
 
     var googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-        maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3']
+        maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: '© Google Hybrid'
     });
 
     var googleRoads = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-        maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3']
+        maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: '© Google Roads'
     });
 
-    // 2. Bhuvan Cadastral
-    var cadastralLayer = L.tileLayer.wms('https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms', {
-        layers: 'v3:cadastral', format: 'image/png', transparent: true, version: '1.1.1'
+    // 2. BHUVAN WMS LAYERS[cite: 1]
+    var bhuvanURL = 'https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms';
+
+    var villageLayer = L.tileLayer.wms(bhuvanURL, {
+        layers: 'v3:village',
+        format: 'image/png',
+        transparent: true,
+        version: '1.1.1',
+        opacity: 1.0,
+        className: 'village-style'
     });
 
-    // 3. Initialize Map (Default with OSM and Cadastral)
+    var cadastralLayer = L.tileLayer.wms(bhuvanURL, {
+        layers: 'v3:cadastral',
+        format: 'image/png',
+        transparent: true,
+        version: '1.1.1',
+        opacity: 0.9
+    });
+
+    // 3. INITIALIZE MAP[cite: 1]
     var map = L.map('map', {
-        center: [11.196, 76.227],
+        center: [11.196, 76.227], 
         zoom: 14,
-        layers: [osmStandard, cadastralLayer]
+        layers: [googleHybrid, villageLayer] 
     });
 
-    // Layer Controls
+    // LAYER CONTROL
     var baseMaps = {
-        "OSM Standard": osmStandard,
         "Google Hybrid": googleHybrid,
-        "Google Road": googleRoads
+        "Google Road Map": googleRoads,
+        "OSM Standard": osmStandard
     };
     
     var overlayMaps = {
-        "Cadastral (NRSC)": cadastralLayer
+        "Village Boundary": villageLayer,
+        "Cadastral (Survey No)": cadastralLayer
     };
 
-    L.control.layers(baseMaps, overlayMaps).addTo(map);
+    L.control.layers(baseMaps, overlayMaps, {collapsed: false}).addTo(map);
 
-    // 4. Drawing Tools
+    // 4. DRAWING TOOLS[cite: 1]
     var drawnItems = new L.FeatureGroup();
     map.addLayer(drawnItems);
 
     var drawControl = new L.Control.Draw({
         edit: { featureGroup: drawnItems },
-        draw: { polygon: true, polyline: true, rectangle: true, circle: false, marker: true }
+        draw: {
+            polygon: { shapeOptions: { color: '#ff0000' } },
+            polyline: { shapeOptions: { color: '#0000ff' } },
+            rectangle: true,
+            circle: false,
+            marker: true
+        }
     });
     map.addControl(drawControl);
 
@@ -115,16 +147,20 @@
         drawnItems.addLayer(event.layer);
     });
 
-    // 5. KML Download
+    // 5. KML DOWNLOAD LOGIC[cite: 1]
     function downloadKML() {
         if (drawnItems.getLayers().length === 0) {
-            alert("Line draw cheythittilla!"); return;
+            alert("Line-o polygon-o draw cheyyuka."); return;
         }
         var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>';
         drawnItems.eachLayer(function(layer) {
-            if (layer instanceof L.Polyline || layer instanceof L.Polygon) {
+            if (layer instanceof L.Marker) {
+                kml += '<Placemark><Point><coordinates>' + layer.getLatLng().lng + ',' + layer.getLatLng().lat + ',0</coordinates></Point></Placemark>';
+            } else {
                 kml += '<Placemark><LineString><coordinates>';
-                layer.getLatLngs().flat().forEach(ll => kml += ll.lng + ',' + ll.lat + ',0 ');
+                var coords = layer.getLatLngs();
+                if (Array.isArray(coords[0])) coords = coords[0];
+                coords.forEach(ll => kml += ll.lng + ',' + ll.lat + ',0 ');
                 kml += '</coordinates></LineString></Placemark>';
             }
         });
@@ -132,28 +168,35 @@
         var blob = new Blob([kml], {type: "application/vnd.google-earth.kml+xml"});
         var a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "drawings.kml";
+        a.download = "Survey_Drawings.kml";
         a.click();
     }
 
-    // 6. KML Upload
+    // 6. KML UPLOAD LOGIC[cite: 1]
     document.getElementById('uploadKML').addEventListener('change', function(e) {
         var file = e.target.files[0];
         if (!file) return;
         var reader = new FileReader();
         reader.onload = function(event) {
-            omnivore.kml.parse(event.target.result).addTo(map);
+            var customLayer = omnivore.kml.parse(event.target.result);
+            customLayer.addTo(map);
+            customLayer.on('ready', function() {
+                map.fitBounds(customLayer.getBounds());
+            });
         };
         reader.readAsText(file);
     });
 
-    // 7. GPS Control
-    var locationMarker, isTracking = false;
+    // 7. LIVE GPS TRACKING[cite: 1]
+    var locationMarker, locationCircle, isTracking = false;
+
     var gpsControl = L.Control.extend({
         options: { position: 'topleft' },
         onAdd: function (map) {
             var btn = L.DomUtil.create('a', 'gps-button leaflet-bar leaflet-control');
             btn.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i>';
+            btn.title = "Live GPS Tracking";
+            
             L.DomEvent.on(btn, 'click', function (e) {
                 L.DomEvent.stopPropagation(e);
                 if (!isTracking) {
@@ -172,8 +215,13 @@
     map.addControl(new gpsControl());
 
     map.on('locationfound', function(e) {
-        if (!locationMarker) locationMarker = L.marker(e.latlng).addTo(map);
-        else locationMarker.setLatLng(e.latlng);
+        if (!locationMarker) {
+            locationMarker = L.marker(e.latlng).addTo(map).bindPopup("You are here").openPopup();
+            locationCircle = L.circle(e.latlng, e.accuracy / 2).addTo(map);
+        } else {
+            locationMarker.setLatLng(e.latlng);
+            locationCircle.setLatLng(e.latlng).setRadius(e.accuracy / 2);
+        }
     });
 
 </script>
