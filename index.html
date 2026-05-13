@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Murali Master GIS</title>
+    <title>Master GIS - Murali Sir</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
@@ -15,8 +15,11 @@
     <style>
         #map { height: 100vh; width: 100%; position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
         body { margin: 0; padding: 0; font-family: sans-serif; overflow: hidden; }
+        
+        /* Village Boundary Highlighter (Bhuvan) */
         .village-style { filter: contrast(400%) brightness(50%) saturate(8) hue-rotate(320deg) !important; opacity: 1; }
 
+        /* UI Auto-Hide Logic */
         .leaflet-control-layers, .leaflet-draw, .control-panel, .leaflet-bar, .gps-control {
             opacity: 0; visibility: hidden; transition: opacity 0.6s ease; pointer-events: none;
         }
@@ -36,97 +39,153 @@
             font-size: 18px; color: #333; width: 44px; height: 44px; text-align: center;
         }
         .gps-active { color: white !important; background-color: #007bff !important; }
+        
         .blue-dot { width: 15px; height: 15px; background-color: #007bff; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+
         .btn { background: #007bff; color: white; border: none; padding: 10px 18px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: bold; }
         .nav-btn { background: #28a745; color: white; border: none; padding: 8px; border-radius: 5px; width: 100%; cursor: pointer; margin-top: 5px; font-weight: bold; }
         .del-btn { background: #dc3545; color: white; border: none; padding: 6px; border-radius: 4px; width: 100%; cursor: pointer; margin-top: 5px; font-size: 11px; }
+        
+        #hintText { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 2000; background: rgba(0,0,0,0.6); color: white; padding: 5px 15px; border-radius: 20px; font-size: 12px; pointer-events: none; }
     </style>
 </head>
 <body class="show-ui">
 
+<div id="hintText">Tap for tools | Zoom lock at GPS: 1:500</div>
 <div id="map"></div>
+
 <div class="control-panel">
     <button class="btn" onclick="downloadKML()"><i class="fa-solid fa-file-export"></i> KML Save</button>
 </div>
 
 <script>
-    // 1. MAPS
-    var gHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'] });
-    var gRoad = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'] });
+    // 1. SETUP BASE MAPS
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+    var gHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
+    var gRoad = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
+
+    // 2. BHUVAN LAYERS
     var bhuvanURL = 'https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms';
     var vLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:village', format: 'image/png', transparent: true, className: 'village-style' });
     var cLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:cadastral', format: 'image/png', transparent: true });
 
+    // 3. MAP INITIALIZATION
     var map = L.map('map', { center: [11.196, 76.227], zoom: 14, layers: [gHybrid, vLayer], zoomControl: false });
-    L.control.layers({ "Hybrid": gHybrid, "Road": gRoad }, { "Village": vLayer, "Cadastral": cLayer }, { collapsed: false }).addTo(map);
 
-    // 2. GPS
+    L.control.layers({ "Google Hybrid": gHybrid, "Google Road": gRoad, "OSM Map": osm }, 
+                     { "Village Boundary": vLayer, "Cadastral (Survey)": cLayer }, { collapsed: false }).addTo(map);
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    // 4. GPS BLUE DOT & ZOOM LIMIT (1:500 Logic)
     var uMarker, aCircle, isGPS = false;
     var blueIcon = L.divIcon({ className: 'blue-dot', iconSize: [15, 15], iconAnchor: [7, 7] });
+
     var gpsCtrl = L.Control.extend({
         options: { position: 'topleft' },
         onAdd: function(map) {
             var btn = L.DomUtil.create('a', 'gps-button gps-control');
             btn.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i>';
             L.DomEvent.on(btn, 'click', (e) => {
-                L.DomEvent.stopPropagation(e);
-                if(!isGPS) { map.locate({setView: true, watch: true}); btn.classList.add('gps-active'); isGPS = true; }
-                else { map.stopLocate(); if(uMarker) map.removeLayer(uMarker); btn.classList.remove('gps-active'); isGPS = false; }
+                L.DomEvent.stopPropagation(e); showUI();
+                if(!isGPS) {
+                    // Start GPS with Zoom Lock at 20 (approx 1:500 scale)
+                    map.locate({setView: false, watch: true, enableHighAccuracy: true});
+                    isGPS = true; btn.classList.add('gps-active');
+                } else {
+                    map.stopLocate();
+                    if(uMarker) map.removeLayer(uMarker);
+                    if(aCircle) map.removeLayer(aCircle);
+                    uMarker = null; aCircle = null;
+                    isGPS = false; btn.classList.remove('gps-active');
+                }
             });
             return btn;
         }
     });
     map.addControl(new gpsCtrl());
+
     map.on('locationfound', (e) => {
-        if(!uMarker) uMarker = L.marker(e.latlng, {icon: blueIcon}).addTo(map);
-        else uMarker.setLatLng(e.latlng);
+        // Zoom adjustment for 1:500 scale
+        if (map.getZoom() < 20) {
+            map.setView(e.latlng, 20); 
+        } else {
+            map.panTo(e.latlng);
+        }
+
+        if(!uMarker) {
+            uMarker = L.marker(e.latlng, {icon: blueIcon}).addTo(map);
+            aCircle = L.circle(e.latlng, {radius: e.accuracy, color: '#007bff', opacity: 0.2, fillOpacity: 0.1}).addTo(map);
+        } else {
+            uMarker.setLatLng(e.latlng); aCircle.setLatLng(e.latlng).setRadius(e.accuracy);
+        }
     });
 
-    // 3. STORAGE & NOTES
+    // 5. PERMANENT NOTES (LOCAL STORAGE)
     var pinGroup = L.layerGroup().addTo(map);
-    var savedNotes = JSON.parse(localStorage.getItem('murali_v5') || '[]');
+    var savedNotes = JSON.parse(localStorage.getItem('murali_notes_v6') || '[]');
+
     function renderNotes() {
         pinGroup.clearLayers();
         savedNotes.forEach((p, i) => {
-            L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(`<b>Note:</b><br>${p.text}<br><button class="nav-btn" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}')">Directions</button><button class="del-btn" onclick="deleteNote(${i})">Delete</button>`);
+            var m = L.marker([p.lat, p.lng]).addTo(pinGroup);
+            m.bindPopup(`<b>Note:</b><br>${p.text}<br><button class="nav-btn" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}')">Navigate Here</button><button class="del-btn" onclick="deleteNote(${i})">Delete</button>`);
         });
     }
-    window.deleteNote = (i) => { savedNotes.splice(i, 1); localStorage.setItem('murali_v5', JSON.stringify(savedNotes)); renderNotes(); };
+
+    window.deleteNote = (i) => {
+        savedNotes.splice(i, 1);
+        localStorage.setItem('murali_notes_v6', JSON.stringify(savedNotes));
+        renderNotes();
+    };
     renderNotes();
 
-    // 4. DRAWING
+    // 6. DRAWING & AREA CALCULATION
     var drawnItems = new L.FeatureGroup().addTo(map);
-    new L.Control.Draw({ edit: { featureGroup: drawnItems }, draw: { circle: false } }).addTo(map);
+    new L.Control.Draw({ 
+        edit: { featureGroup: drawnItems }, 
+        draw: { circle: false, marker: true } 
+    }).addTo(map);
+
     map.on(L.Draw.Event.CREATED, (e) => {
-        var layer = e.layer; drawnItems.addLayer(layer);
+        var layer = e.layer;
+        drawnItems.addLayer(layer);
+        
         if (e.layerType === 'polygon' || e.layerType === 'rectangle') {
             var area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
-            layer.bindPopup(`Area: ${(area * 0.000247).toFixed(3)} Acres`).openPopup();
+            var acres = (area * 0.000247105).toFixed(3);
+            var cents = (area * 0.0247105).toFixed(2);
+            layer.bindPopup(`<b>Land Area:</b><br>${area.toFixed(2)} Sq.m<br>${acres} Acres<br>${cents} Cents`).openPopup();
         }
+
         if (e.layerType === 'marker') {
             var ll = layer.getLatLng();
-            var txt = prompt("Enter note:");
-            if(txt) { savedNotes.push({lat: ll.lat, lng: ll.lng, text: txt}); localStorage.setItem('murali_v5', JSON.stringify(savedNotes)); renderNotes(); }
+            var txt = prompt("Enter note for this location:");
+            if(txt) {
+                savedNotes.push({lat: ll.lat, lng: ll.lng, text: txt});
+                localStorage.setItem('murali_notes_v6', JSON.stringify(savedNotes));
+                renderNotes();
+            }
             map.removeLayer(layer);
         }
     });
 
-    // 5. UI FADE
-    var t; function show() { document.body.classList.add('show-ui'); clearTimeout(t); t = setTimeout(() => document.body.classList.remove('show-ui'), 5000); }
-    map.on('mousedown dragstart touchstart', show);
+    // 7. UI AUTO-HIDE
+    var t; function showUI() { document.body.classList.add('show-ui'); clearTimeout(t); t = setTimeout(() => document.body.classList.remove('show-ui'), 5000); }
+    map.on('mousedown dragstart touchstart', showUI);
 
+    // 8. KML EXPORT
     function downloadKML() {
         var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>';
         drawnItems.eachLayer(l => {
-            kml += '<Placemark><coordinates>';
+            kml += '<Placemark><LineString><coordinates>';
             var c = l.getLatLngs ? (Array.isArray(l.getLatLngs()[0]) ? l.getLatLngs()[0] : l.getLatLngs()) : [l.getLatLng()];
             c.forEach(p => kml += `${p.lng},${p.lat},0 `);
-            kml += '</coordinates></Placemark>';
+            kml += '</coordinates></LineString></Placemark>';
         });
         kml += '</Document></kml>';
-        var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([kml])); a.download = "Map.kml"; a.click();
+        var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([kml])); a.download = "Survey_Data.kml"; a.click();
     }
-    show();
+    showUI();
 </script>
 </body>
 </html>
