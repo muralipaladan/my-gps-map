@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Murali Master GIS - Crosshair Pro</title>
+    <title>Murali Master GIS - Pro v9</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
@@ -16,10 +16,9 @@
         #map { height: 100vh; width: 100%; position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
         body { margin: 0; padding: 0; font-family: sans-serif; overflow: hidden; background: #000; }
         
-        /* Village Line Style */
-        .village-style { filter: contrast(400%) brightness(50%) saturate(8) hue-rotate(320deg) !important; opacity: 0.9; }
+        /* High Contrast Village Layer */
+        .village-style { filter: contrast(500%) brightness(40%) saturate(10) hue-rotate(320deg) !important; opacity: 1; }
 
-        /* UI Visibility Control */
         .leaflet-control-layers, .leaflet-draw, .control-panel, .leaflet-bar, .gps-control {
             opacity: 0; visibility: hidden; transition: opacity 0.6s ease; pointer-events: none;
         }
@@ -37,17 +36,14 @@
             background-color: white; border: 2px solid rgba(0,0,0,0.2);
             border-radius: 50%; padding: 8px; cursor: pointer;
             font-size: 18px; color: #333; width: 46px; height: 46px; text-align: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
         .gps-active { color: white !important; background-color: #007bff !important; }
         
-        /* BLUE DOT & CROSSHAIR STYLE */
+        /* Crosshair Blue Dot */
         .blue-dot-container { display: flex; align-items: center; justify-content: center; position: relative; }
         .blue-dot { width: 12px; height: 12px; background: #007bff; border: 2px solid #fff; border-radius: 50%; z-index: 5; }
-        
-        /* The Cross Lines */
-        .cross-v { position: absolute; width: 2px; height: 50px; background: rgba(0, 123, 255, 0.7); }
-        .cross-h { position: absolute; width: 50px; height: 2px; background: rgba(0, 123, 255, 0.7); }
+        .cross-v { position: absolute; width: 2px; height: 60px; background: rgba(0, 123, 255, 0.8); }
+        .cross-h { position: absolute; width: 60px; height: 2px; background: rgba(0, 123, 255, 0.8); }
 
         .btn { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: bold; }
         .nav-btn { background: #28a745; color: white; border: none; padding: 8px; border-radius: 5px; width: 100%; cursor: pointer; margin-top: 5px; font-weight: bold; }
@@ -57,7 +53,6 @@
 <body class="show-ui">
 
 <div id="map"></div>
-
 <div class="control-panel">
     <button class="btn" onclick="downloadKML()"><i class="fa-solid fa-file-export"></i> Save KML</button>
     <label class="btn" style="background: #6c757d;">
@@ -66,29 +61,32 @@
 </div>
 
 <script>
-    // 1. LAYERS INITIALIZATION
-    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+    // 1. BASE LAYERS
     var gHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
     var gRoad = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
 
+    // 2. BHUVAN LAYERS WITH ZOOM FIX
     var bhuvanURL = 'https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms';
-    var vLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:village', format: 'image/png', transparent: true, className: 'village-style' });
-    var cLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:cadastral', format: 'image/png', transparent: true });
+    // TileSize & ZoomOffset help keep layers visible at higher zoom levels
+    var vLayer = L.tileLayer.wms(bhuvanURL, { 
+        layers: 'v3:village', format: 'image/png', transparent: true, className: 'village-style',
+        maxZoom: 22, tileSize: 512, zoomOffset: -1 
+    });
+    var cLayer = L.tileLayer.wms(bhuvanURL, { 
+        layers: 'v3:cadastral', format: 'image/png', transparent: true,
+        maxZoom: 22, tileSize: 512, zoomOffset: -1 
+    });
 
     var map = L.map('map', { center: [11.196, 76.227], zoom: 14, layers: [gHybrid, vLayer], zoomControl: false });
+    L.control.layers({ "Hybrid": gHybrid, "Road": gRoad, "OSM": osm }, { "Village Boundary": vLayer, "Cadastral Map": cLayer }, { collapsed: false }).addTo(map);
 
-    L.control.layers({ "Hybrid Map": gHybrid, "Road Map": gRoad, "OSM Map": osm }, 
-                     { "Village Line": vLayer, "Survey Map": cLayer }, { collapsed: false }).addTo(map);
-
-    // 2. BLUE DOT WITH CROSSHAIR (AUTO-ZOOM DISABLED)
+    // 3. CROSSHAIR GPS (NO AUTO ZOOM)
     var userMarker, accuracyCircle, isGPS = false;
-    
-    // Custom DivIcon for Crosshair
     var crossIcon = L.divIcon({
         className: 'blue-dot-container',
         html: '<div class="cross-v"></div><div class="cross-h"></div><div class="blue-dot"></div>',
-        iconSize: [50, 50],
-        iconAnchor: [25, 25]
+        iconSize: [60, 60], iconAnchor: [30, 30]
     });
 
     var gpsCtrl = L.Control.extend({
@@ -97,9 +95,9 @@
             var btn = L.DomUtil.create('a', 'gps-button gps-control');
             btn.innerHTML = '<i class="fa-solid fa-crosshairs"></i>';
             L.DomEvent.on(btn, 'click', (e) => {
-                L.DomEvent.stopPropagation(e); showUI();
+                L.DomEvent.stopPropagation(e);
                 if(!isGPS) {
-                    map.locate({setView: true, watch: true, enableHighAccuracy: true}); // Initially setView once, then watch
+                    map.locate({setView: true, watch: true, enableHighAccuracy: true}); // SetView once, then just pan
                     isGPS = true; btn.classList.add('gps-active');
                 } else {
                     map.stopLocate();
@@ -115,9 +113,8 @@
     map.addControl(new gpsCtrl());
 
     map.on('locationfound', (e) => {
-        // Auto-Zoom Removed: Just move the map to user position without changing current zoom
+        // Only Panning, No Auto-Zooming
         map.panTo(e.latlng);
-
         if(!userMarker) {
             userMarker = L.marker(e.latlng, {icon: crossIcon}).addTo(map);
             accuracyCircle = L.circle(e.latlng, {radius: e.accuracy, color: '#007bff', weight: 1, opacity: 0.3, fillOpacity: 0.05}).addTo(map);
@@ -127,67 +124,54 @@
         }
     });
 
-    // 3. PERMANENT NOTES (STORAGE)
+    // 4. PERSISTENT NOTES
     var pinGroup = L.layerGroup().addTo(map);
-    var savedNotes = JSON.parse(localStorage.getItem('murali_master_final') || '[]');
+    var savedNotes = JSON.parse(localStorage.getItem('murali_final_v9') || '[]');
     function renderNotes() {
         pinGroup.clearLayers();
         savedNotes.forEach((p, i) => {
-            L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(`<b>Note:</b><br>${p.text}<br><button class="nav-btn" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}')">Directions</button><button class="del-btn" onclick="deleteNote(${i})">Delete</button>`);
+            L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(`<b>Note:</b><br>${p.text}<br><button class="nav-btn" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}')">Navigate</button><button class="del-btn" onclick="deleteNote(${i})">Delete</button>`);
         });
     }
-    window.deleteNote = (i) => {
-        savedNotes.splice(i, 1);
-        localStorage.setItem('murali_master_final', JSON.stringify(savedNotes));
-        renderNotes();
-    };
+    window.deleteNote = (i) => { savedNotes.splice(i, 1); localStorage.setItem('murali_final_v9', JSON.stringify(savedNotes)); renderNotes(); };
     renderNotes();
 
-    // 4. DRAWING & AREA (Acres/Cents)
+    // 5. DRAWING & AREA
     var drawnItems = new L.FeatureGroup().addTo(map);
     new L.Control.Draw({ edit: { featureGroup: drawnItems }, draw: { circle: false, circlemarker: false } }).addTo(map);
-    
     map.on(L.Draw.Event.CREATED, (e) => {
-        var layer = e.layer;
-        drawnItems.addLayer(layer);
+        var layer = e.layer; drawnItems.addLayer(layer);
         if (e.layerType === 'polygon' || e.layerType === 'rectangle') {
             var area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
-            var ac = (area * 0.000247105).toFixed(3);
-            var ct = (area * 0.0247105).toFixed(2);
-            layer.bindPopup(`<b>Area:</b><br>${area.toFixed(2)} Sq.m<br>${ac} Acres<br>${ct} Cents`).openPopup();
+            layer.bindPopup(`<b>Area:</b><br>${(area * 0.000247).toFixed(3)} Acres<br>${(area * 0.0247).toFixed(2)} Cents`).openPopup();
         }
         if (e.layerType === 'marker') {
             var ll = layer.getLatLng(), txt = prompt("Save Note:");
-            if(txt) {
-                savedNotes.push({lat: ll.lat, lng: ll.lng, text: txt});
-                localStorage.setItem('murali_master_final', JSON.stringify(savedNotes));
-                renderNotes();
-            }
+            if(txt) { savedNotes.push({lat: ll.lat, lng: ll.lng, text: txt}); localStorage.setItem('murali_final_v9', JSON.stringify(savedNotes)); renderNotes(); }
             map.removeLayer(layer);
         }
     });
 
-    // 5. FILE UPLOAD (KML/JSON)
+    // 6. FILE HANDLER
     document.getElementById('uploadFile').onchange = function(e) {
         var file = e.target.files[0];
         if (!file) return;
         var reader = new FileReader();
         reader.onload = function(event) {
-            var content = event.target.result;
             try {
                 if (file.name.endsWith('.kml')) {
-                    var kLayer = omnivore.kml.parse(content).addTo(map);
-                    kLayer.on('ready', () => map.fitBounds(kLayer.getBounds()));
+                    var k = omnivore.kml.parse(event.target.result).addTo(map);
+                    k.on('ready', () => map.fitBounds(k.getBounds()));
                 } else {
-                    var jLayer = L.geoJSON(JSON.parse(content)).addTo(map);
-                    map.fitBounds(jLayer.getBounds());
+                    var j = L.geoJSON(JSON.parse(event.target.result)).addTo(map);
+                    map.fitBounds(j.getBounds());
                 }
-            } catch(err) { alert("File Error"); }
+            } catch(err) { alert("Format Error"); }
         };
         reader.readAsText(file);
     };
 
-    // 6. UI MANAGEMENT
+    // 7. UI FADE
     var uiT; function showUI() { document.body.classList.add('show-ui'); clearTimeout(uiT); uiT = setTimeout(() => document.body.classList.remove('show-ui'), 6000); }
     map.on('mousedown dragstart touchstart', showUI);
 
@@ -200,7 +184,7 @@
             kml += '</coordinates></LineString></Placemark>';
         });
         kml += '</Document></kml>';
-        var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([kml])); a.download = "Murali_Master.kml"; a.click();
+        var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([kml])); a.download = "Murali_GIS_V9.kml"; a.click();
     }
     showUI();
 </script>
