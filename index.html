@@ -1,16 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Murali Master GIS - Pro Tracing</title>
+    <title>Murali Master GIS - Pro Georeference & Tracing</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    
     <script src="https://unpkg.com/@mapbox/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-distortableimage@0.21.7/dist/vendor.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-distortableimage@0.21.7/dist/leaflet.distortableimage.css">
+    <script src="https://unpkg.com/leaflet-distortableimage@0.21.7/dist/leaflet.distortableimage.js"></script>
 
     <style>
         #map { height: 100vh; width: 100%; position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
@@ -30,6 +37,7 @@
             position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%);
             z-index: 1000; background: rgba(255, 255, 255, 0.95); padding: 8px 15px; border-radius: 30px;
             display: flex; flex-direction: row; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            align-items: center;
         }
 
         .gps-button {
@@ -53,15 +61,39 @@
             display: none; pointer-events: none; overflow: hidden;
         }
 
-        .btn { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .btn { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: bold; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
         .nav-btn { background: #28a745; color: white; border: none; padding: 8px; border-radius: 5px; width: 100%; cursor: pointer; margin-top: 5px; font-weight: bold; }
         .del-btn { background: #dc3545; color: white; border: none; padding: 6px; border-radius: 4px; width: 100%; cursor: pointer; margin-top: 5px; font-size: 11px; }
+        
+        /* FMB Image Control Panel Styling */
+        .fmb-control-box {
+            display: flex; flex-direction: column; gap: 5px; background: rgba(255, 255, 255, 0.9); padding: 8px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            position: fixed; top: 80px; right: 10px; z-index: 1001;
+        }
+        .fmb-control-box h4 { margin: 0 0 5px 0; font-size: 13px; text-align: center; color: #333; }
+        .slider-container { display: flex; align-items: center; gap: 5px; }
+        .slider-container span { font-size: 11px; font-weight: bold; color: #333; }
+
     </style>
 </head>
 <body class="show-ui">
 
 <div id="map"></div>
-<div id="zoomBox"></div> <div class="control-panel">
+<div id="zoomBox"></div> 
+
+<div class="fmb-control-box show-ui">
+    <h4>FMB Georeference</h4>
+    <label class="btn" style="background: #28a745; font-size: 11px; padding: 6px 12px;">
+        <i class="fa-solid fa-image"></i> Load FMB JPG <input type="file" id="uploadFMB" accept=".jpg,.jpeg" style="display:none">
+    </label>
+    <div class="slider-container">
+        <span>Opacity:</span>
+        <input type="range" id="fmbOpacity" min="0" max="1" step="0.1" value="0.7" style="width: 70px;">
+    </div>
+    <button class="btn" style="background: #dc3545; font-size: 11px; padding: 6px 12px;" onclick="removeFMB()"><i class="fa-solid fa-trash"></i> Remove FMB</button>
+</div>
+
+<div class="control-panel">
     <button class="btn" onclick="downloadKML()"><i class="fa-solid fa-file-export"></i> Save KML</button>
     <label class="btn" style="background: #6c757d;">
         <i class="fa-solid fa-file-import"></i> Load KML/JSON <input type="file" id="uploadFile" accept=".kml,.json,.geojson" style="display:none">
@@ -69,24 +101,82 @@
 </div>
 
 <script>
-    // 1. LAYERS
+    // 1. BASE LAYERS
     var gHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
     var gRoad = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
     var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
 
+    // 2. WMS LAYERS (BHUVAN)
     var bhuvanURL = 'https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms';
     var vLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:village', format: 'image/png', transparent: true, className: 'village-style', maxZoom: 22, tileSize: 512, zoomOffset: -1 });
     var cLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:cadastral', format: 'image/png', transparent: true, maxZoom: 22, tileSize: 512, zoomOffset: -1 });
 
-    var map = L.map('map', { center: [11.196, 76.227], zoom: 14, layers: [gHybrid, vLayer], zoomControl: false });
-    L.control.layers({ "Hybrid": gHybrid, "Road": gRoad, "OSM": osm }, { "Village": vLayer, "Cadastral": cLayer }, { collapsed: false }).addTo(map);
+    // Initialize Map
+    var map = L.map('map', { center: [11.196, 76.227], zoom: 16, layers: [gHybrid, vLayer], zoomControl: false });
+    
+    // Layer Control
+    var baseMaps = { "Hybrid": gHybrid, "Road": gRoad, "OSM": osm };
+    var overlayMaps = { "Village": vLayer, "Cadastral": cLayer };
+    var layerControl = L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
 
     // Mini Map For Magnifier Window
     var miniMap = L.map('zoomBox', { attributionControl: false, zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false });
     var miniLayer = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] }).addTo(miniMap);
     var miniCadastral = L.tileLayer.wms(bhuvanURL, { layers: 'v3:cadastral', format: 'image/png', transparent: true, maxZoom: 22, tileSize: 512, zoomOffset: -1 }).addTo(miniMap);
 
-    // 2. CROSSHAIR GPS (NO AUTO ZOOM)
+    // --- *** 3. FMB IMAGE GEOREFERENCE (MOVE, ROTATE, SCALE) LOGIC *** ---
+    
+    var fmbImageLayer = null; // Global variable to hold the FMB layer
+
+    // Function to handle FMB Image Upload and add to map
+    document.getElementById('uploadFMB').onchange = function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+
+        var reader = new FileReader();
+        reader.onload = function(event) {
+            var imgUrl = event.target.result;
+
+            // If an FMB layer already exists, remove it first
+            removeFMB();
+
+            // Create a new Distortable Image Overlay
+            // It initially places the image in the center of the current map view
+            fmbImageLayer = L.distortableImageOverlay(imgUrl, {
+                opacity: document.getElementById('fmbOpacity').value,
+                actions: ['drag', 'scale', 'rotate', 'lock'], // Enable Move, Scale (Expand), Rotate
+                selected: true // Make it selected immediately to show handles
+            }).addTo(map);
+
+            // Add FMB to Layer Control so it can be toggled
+            layerControl.addOverlay(fmbImageLayer, "Current FMB JPG");
+            
+            // Optional: fit map bounds to the newly added image area
+            // map.fitBounds(fmbImageLayer.getBounds()); 
+        };
+        reader.readAsDataURL(file); // Read as Data URL for the image overlay
+    };
+
+    // Function to remove FMB Layer
+    window.removeFMB = function() {
+        if (fmbImageLayer) {
+            layerControl.removeLayer(fmbImageLayer); // Remove from control
+            map.removeLayer(fmbImageLayer); // Remove from map
+            fmbImageLayer = null;
+            document.getElementById('uploadFMB').value = ""; // Clear file input
+        }
+    }
+
+    // FMB Opacity Slider Dynamic Change
+    document.getElementById('fmbOpacity').addEventListener('input', function(e) {
+        if (fmbImageLayer) {
+            fmbImageLayer.setOpacity(e.target.value);
+        }
+    });
+    // --- *** END FMB GEOREFERENCE LOGIC *** ---
+
+
+    // 4. CROSSHAIR GPS (NO AUTO ZOOM)
     var userMarker, accuracyCircle, isGPS = false;
     var crossIcon = L.divIcon({ className: 'blue-dot-container', html: '<div class="cross-v"></div><div class="cross-h"></div><div class="blue-dot"></div>', iconSize: [60, 60], iconAnchor: [30, 30] });
 
@@ -113,7 +203,7 @@
         } else { userMarker.setLatLng(e.latlng); accuracyCircle.setLatLng(e.latlng).setRadius(e.accuracy); }
     });
 
-    // 3. STORAGE & NOTES
+    // 5. STORAGE & NOTES
     var pinGroup = L.layerGroup().addTo(map);
     var savedNotes = JSON.parse(localStorage.getItem('murali_final_v10') || '[]');
     function renderNotes() {
@@ -125,7 +215,7 @@
     window.deleteNote = (i) => { savedNotes.splice(i, 1); localStorage.setItem('murali_final_v10', JSON.stringify(savedNotes)); renderNotes(); };
     renderNotes();
 
-    // 4. DRAWING & MAGNIFIER LOGIC
+    // 6. DRAWING & MAGNIFIER LOGIC
     var drawnItems = new L.FeatureGroup().addTo(map);
     var drawControl = new L.Control.Draw({ edit: { featureGroup: drawnItems }, draw: { circle: false, circlemarker: false } });
     map.addControl(drawControl);
@@ -136,7 +226,7 @@
 
     map.on('mousemove', function(e) {
         if(isDrawing) {
-            miniMap.setView(e.latlng, map.getZoom() + 3); // Dynamic Zoom View inside Magnifier
+            miniMap.setView(e.latlng, map.getZoom() + 3);
         }
     });
 
@@ -153,7 +243,7 @@
         }
     });
 
-    // 5. FILE HANDLING
+    // 7. FILE HANDLING (KML/JSON)
     document.getElementById('uploadFile').onchange = function(e) {
         var file = e.target.files[0]; if (!file) return;
         var reader = new FileReader();
@@ -166,10 +256,10 @@
         reader.readAsText(file);
     };
 
-    // 6. UI FADE MANAGEMENT
+    // 8. UI FADE MANAGEMENT
     var uiT; 
     function showUI() { 
-        if(isDrawing) return; // Drawing ചെയ്യുമ്പോൾ ടൂളുകൾ തനിയെ മറയില്ല
+        if(isDrawing) return; 
         document.body.classList.add('show-ui'); 
         clearTimeout(uiT); 
         uiT = setTimeout(() => { if(!isDrawing) document.body.classList.remove('show-ui'); }, 6000); 
