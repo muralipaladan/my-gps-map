@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Murali Master GIS - Pro Georeference & Tracing</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    
+    <script src="https://unpkg.com/@mapbox/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        #map { height: 100vh; width: 100%; position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
+        body { margin: 0; padding: 0; font-family: sans-serif; overflow: hidden; background: #000; }
+        
+        .village-style { filter: contrast(400%) brightness(50%) saturate(8) hue-rotate(320deg) !important; opacity: 0.9; }
+
+        /* UI Control Panel Fading */
+        .leaflet-control-layers, .leaflet-draw, .control-panel, .leaflet-bar, .gps-control, .fmb-bottom-panel {
+            opacity: 0; visibility: hidden; transition: opacity 0.6s ease; pointer-events: none;
+        }
+        .show-ui .leaflet-control-layers, .show-ui .leaflet-draw, .show-ui .control-panel, .show-ui .leaflet-bar, .show-ui .gps-control, .show-ui .fmb-bottom-panel {
+            opacity: 1; visibility: visible; pointer-events: auto;
+        }
+
+        /* Bottom Main Control Panel */
+        .control-panel {
+            position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; background: rgba(255, 255, 255, 0.95); padding: 8px 15px; border-radius: 30px;
+            display: flex; flex-direction: row; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            align-items: center;
+        }
+
+        .gps-button {
+            background-color: white; border: 2px solid rgba(0,0,0,0.2);
+            border-radius: 50%; padding: 8px; cursor: pointer;
+            font-size: 18px; color: #333; width: 46px; height: 46px; text-align: center;
+        }
+        .gps-active { color: white !important; background-color: #007bff !important; }
+        
+        /* Crosshair Style */
+        .blue-dot-container { display: flex; align-items: center; justify-content: center; position: relative; }
+        .blue-dot { width: 12px; height: 12px; background: #007bff; border: 2px solid #fff; border-radius: 50%; z-index: 5; }
+        .cross-v { position: absolute; width: 2px; height: 60px; background: rgba(0, 123, 255, 0.8); }
+        .cross-h { position: absolute; width: 60px; height: 2px; background: rgba(0, 123, 255, 0.8); }
+
+        /* Magnifier Window */
+        #zoomBox {
+            position: absolute; top: 20px; left: 20px; width: 130px; height: 130px;
+            border: 3px solid #007bff; border-radius: 10px; z-index: 3000;
+            background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            display: none; pointer-events: none; overflow: hidden;
+        }
+
+        .btn { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: bold; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+        .nav-btn { background: #28a745; color: white; border: none; padding: 8px; border-radius: 5px; width: 100%; cursor: pointer; margin-top: 5px; font-weight: bold; }
+        .del-btn { background: #dc3545; color: white; border: none; padding: 6px; border-radius: 4px; width: 100%; cursor: pointer; margin-top: 5px; font-size: 11px; }
+        
+        /* NEW: FMB Georeference Bottom Panel Styling */
+        .fmb-bottom-panel {
+            position: absolute; bottom: 85px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; background: rgba(255, 255, 255, 0.96); padding: 12px; border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4); display: flex; flex-direction: column; gap: 8px;
+            width: 310px; border: 1px solid rgba(0,123,255,0.2);
+        }
+        .fmb-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        .fmb-header h4 { margin: 0; font-size: 13px; color: #111; }
+        
+        .fmb-control-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .pad-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; width: 90px; }
+        .pad-btn { background: #6c757d; color: white; border: none; padding: 5px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; text-align: center; }
+        .pad-btn:active { background: #343a40; }
+
+        .action-block { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+        .action-label { font-size: 10px; font-weight: bold; color: #555; text-transform: uppercase; }
+        .sub-row { display: flex; gap: 4px; }
+        .sub-btn { background: #17a2b8; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .sub-btn:active { background: #117a8b; }
+    </style>
+</head>
+<body class="show-ui">
+
+<div id="map"></div>
+<div id="zoomBox"></div> 
+
+<div class="fmb-bottom-panel">
+    <div class="fmb-header">
+        <h4>FMB Georeference</h4>
+        <label class="btn" style="background: #28a745; font-size: 11px; padding: 6px 10px;">
+            <i class="fa-solid fa-image"></i> Load JPG <input type="file" id="uploadFMB" accept=".jpg,.jpeg,.png" style="display:none">
+        </label>
+    </div>
+    
+    <div id="fmbTools" style="display: none;">
+        <div class="fmb-control-row">
+            <div class="action-block">
+                <span class="action-label">Move</span>
+                <div class="pad-grid">
+                    <button class="pad-btn" onclick="adjustFMB('nw')">↖</button>
+                    <button class="pad-btn" onclick="adjustFMB('up')">↑</button>
+                    <button class="pad-btn" onclick="adjustFMB('ne')">↗</button>
+                    <button class="pad-btn" onclick="adjustFMB('left')">←</button>
+                    <button class="pad-btn" style="background:#007bff;"><i class="fa-solid fa-arrows-up-down-left-right"></i></button>
+                    <button class="pad-btn" onclick="adjustFMB('right')">→</button>
+                    <button class="pad-btn" onclick="adjustFMB('sw')">↙</button>
+                    <button class="pad-btn" onclick="adjustFMB('down')">↓</button>
+                    <button class="pad-btn" onclick="adjustFMB('se')">↘</button>
+                </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:8px; flex-grow:1; align-items:center;">
+                <div class="action-block" style="width:100%;">
+                    <span class="action-label">Size (Scale)</span>
+                    <div class="sub-row" style="width:100%;">
+                        <button class="sub-btn" style="flex:1;" onclick="adjustFMB('zoomin')"><i class="fa-solid fa-plus"></i></button>
+                        <button class="sub-btn" style="flex:1;" onclick="adjustFMB('zoomout')"><i class="fa-solid fa-minus"></i></button>
+                    </div>
+                </div>
+
+                <div class="action-block" style="width:100%;">
+                    <span class="action-label">Rotate (കൃത്യമായ തിരിക്കൽ)</span>
+                    <div class="sub-row" style="width:100%;">
+                        <button class="sub-btn" style="background:#9c27b0; flex:1;" onclick="adjustFMB('rotL')"><i class="fa-solid fa-rotate-left"></i> L</button>
+                        <button class="sub-btn" style="background:#9c27b0; flex:1;" onclick="adjustFMB('rotR')"><i class="fa-solid fa-rotate-right"></i> R</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="fmb-control-row" style="margin-top: 5px; border-top: 1px solid #eee; padding-top: 6px;">
+            <div style="display:flex; align-items:center; gap:5px; flex-grow:1;">
+                <span style="font-size:10px; font-weight:bold;">Opacity:</span>
+                <input type="range" id="fmbOpacity" min="0.1" max="1" step="0.1" value="0.6" style="flex-grow:1;">
+            </div>
+            <button class="btn" style="background: #dc3545; font-size: 10px; padding: 5px 10px;" onclick="removeFMB()"><i class="fa-solid fa-trash"></i> Remove</button>
+        </div>
+    </div>
+</div>
+
+<div class="control-panel">
+    <button class="btn" onclick="downloadKML()"><i class="fa-solid fa-file-export"></i> Save KML</button>
+    <label class="btn" style="background: #6c757d;">
+        <i class="fa-solid fa-file-import"></i> Load KML/JSON <input type="file" id="uploadFile" accept=".kml,.json,.geojson" style="display:none">
+    </label>
+</div>
+
+<script>
+    // 1. BASE LAYERS
+    var gHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
+    var gRoad = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+
+    // 2. WMS LAYERS
+    var bhuvanURL = 'https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms';
+    var vLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:village', format: 'image/png', transparent: true, className: 'village-style', maxZoom: 22, tileSize: 512, zoomOffset: -1 });
+    var cLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:cadastral', format: 'image/png', transparent: true, maxZoom: 22, tileSize: 512, zoomOffset: -1 });
+
+    var map = L.map('map', { center: [11.196, 76.227], zoom: 16, layers: [gHybrid, vLayer], zoomControl: false });
+    
+    var baseMaps = { "Hybrid": gHybrid, "Road": gRoad, "OSM": osm };
+    var overlayMaps = { "Village": vLayer, "Cadastral": cLayer };
+    var layerControl = L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+
+    var miniMap = L.map('zoomBox', { attributionControl: false, zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false });
+    L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] }).addTo(miniMap);
+
+    // --- *** 3. FIXED: SVG OVERLAY LOGIC FOR PERFECT ROTATION & SCALE *** ---
+    var fmbSvgOverlay = null;
+    var fmbImgDataUrl = "";
+    
+    var fmbLat, fmbLng;
+    var fmbWidth = 0.003;
+    var fmbHeight = 0.003;
+    var fmbAngle = 0;
+
+    document.getElementById('uploadFMB').onchange = function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+
+        var reader = new FileReader();
+        reader.onload = function(event) {
+            fmbImgDataUrl = event.target.result;
+            
+            var center = map.getCenter();
+            fmbLat = center.lat;
+            fmbLng = center.lng;
+            fmbAngle = 0;
+            fmbWidth = 0.0025;
+            fmbHeight = 0.0025;
+
+            renderSVGOverlay();
+            document.getElementById('fmbTools').style.display = 'block';
+            showUI();
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // SVG അധിഷ്ഠിതമായി ചിത്രം റെൻഡർ ചെയ്യുന്നു. ഇത് 100% കൃത്യമായി കറങ്ങും!
+    function renderSVGOverlay() {
+        if (!fmbImgDataUrl) return;
+
+        var sW = L.latLng(fmbLat - (fmbHeight/2), fmbLng - (fmbWidth/2));
+        var nE = L.latLng(fmbLat + (fmbHeight/2), fmbLng + (fmbWidth/2));
+        var bounds = L.latLngBounds(sW, nE);
+
+        if (fmbSvgOverlay) {
+            map.removeLayer(fmbSvgOverlay);
+        }
+
+        // അപ്‌ലോഡ് ചെയ്ത ചിത്രത്തെ ഒരു ഇൻലൈൻ SVG കണ്ടെയ്‌നറിനുള്ളിലാക്കി റൊട്ടേറ്റ് ചെയ്യിക്കുന്നു
+        var svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svgElement.setAttribute('xmlns', "http://www.w3.org/2000/svg");
+        svgElement.setAttribute('viewBox', "0 0 100 100");
+        
+        var svgImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
+        svgImage.setAttribute('width', '100');
+        svgImage.setAttribute('height', '100');
+        svgImage.setAttribute('href', fmbImgDataUrl);
+        // മാപ്പ് സൂം ചെയ്താലും ഈ റൊട്ടേഷൻ മാറില്ല
+        svgImage.setAttribute('transform', `rotate(${fmbAngle} 50 50)`);
+        
+        svgElement.appendChild(svgImage);
+
+        fmbSvgOverlay = L.svgOverlay(svgElement, bounds, {
+            opacity: parseFloat(document.getElementById('fmbOpacity').value),
+            interactive: false
+        }).addTo(map);
+    }
+
+    window.adjustFMB = function(action) {
+        if (!fmbSvgOverlay) return;
+
+        var zoomFactor = (22 - map.getZoom());
+        var step = 0.000015 * (zoomFactor <= 0 ? 1 : zoomFactor);
+
+        switch(action) {
+            case 'up':    fmbLat += step; break;
+            case 'down':  fmbLat -= step; break;
+            case 'left':  fmbLng -= step; break;
+            case 'right': fmbLng += step; break;
+            case 'nw':    fmbLat += step; fmbLng -= step; break;
+            case 'ne':    fmbLat += step; fmbLng += step; break;
+            case 'sw':    fmbLat -= step; fmbLng -= step; break;
+            case 'se':    fmbLat -= step; fmbLng += step; break;
+            
+            case 'zoomin':  fmbWidth *= 1.03; fmbHeight *= 1.03; break;
+            case 'zoomout': fmbWidth *= 0.97; fmbHeight *= 0.97; break;
+            
+            // റൊട്ടേഷൻ പ്രശ്നം ഇവിടെ പൂർണ്ണമായി പരിഹരിച്ചു
+            case 'rotL':  fmbAngle -= 1.5; break;
+            case 'rotR':  fmbAngle += 1.5; break;
+        }
+
+        renderSVGOverlay();
+    };
+
+    window.removeFMB = function() {
+        if (fmbSvgOverlay) {
+            map.removeLayer(fmbSvgOverlay);
+            fmbSvgOverlay = null;
+        }
+        fmbImgDataUrl = "";
+        document.getElementById('uploadFMB').value = "";
+        document.getElementById('fmbTools').style.display = 'none';
+    };
+
+    document.getElementById('fmbOpacity').addEventListener('input', function(e) {
+        if (fmbSvgOverlay) {
+            fmbSvgOverlay.setOpacity(e.target.value);
+        }
+    });
+    // --- *** END SVG OVERLAY LOGIC *** ---
+
+    // 4. CROSSHAIR GPS
+    var userMarker, accuracyCircle, isGPS = false;
+    var crossIcon = L.divIcon({ className: 'blue-dot-container', html: '<div class="cross-v"></div><div class="cross-h"></div><div class="blue-dot"></div>', iconSize: [60, 60], iconAnchor: [30, 30] });
+
+    var gpsCtrl = L.Control.extend({
+        options: { position: 'topleft' },
+        onAdd: function(map) {
+            var btn = L.DomUtil.create('a', 'gps-button gps-control');
+            btn.innerHTML = '<i class="fa-solid fa-crosshairs"></i>';
+            L.DomEvent.on(btn, 'click', (e) => {
+                L.DomEvent.stopPropagation(e);
+                if(!isGPS) { map.locate({setView: true, watch: true, enableHighAccuracy: true}); isGPS = true; btn.classList.add('gps-active'); }
+                else { map.stopLocate(); if(userMarker) map.removeLayer(userMarker); if(accuracyCircle) map.removeLayer(accuracyCircle); userMarker = null; accuracyCircle = null; isGPS = false; btn.classList.remove('gps-active'); }
+            });
+            return btn;
+        }
+    });
+    map.addControl(new gpsCtrl());
+
+    map.on('locationfound', (e) => {
+        map.panTo(e.latlng);
+        if(!userMarker) {
+            userMarker = L.marker(e.latlng, {icon: crossIcon}).addTo(map);
+            accuracyCircle = L.circle(e.latlng, {radius: e.accuracy, color: '#007bff', weight: 1, opacity: 0.3, fillOpacity: 0.05}).addTo(map);
+        } else { userMarker.setLatLng(e.latlng); accuracyCircle.setLatLng(e.latlng).setRadius(e.accuracy); }
+    });
+
+    // 5. STORAGE & NOTES
+    var pinGroup = L.layerGroup().addTo(map);
+    var savedNotes = JSON.parse(localStorage.getItem('murali_final_v10') || '[]');
+    function renderNotes() {
+        pinGroup.clearLayers();
+        savedNotes.forEach((p, i) => {
+            L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(`<b>Note:</b><br>${p.text}<br><button class="nav-btn" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}')">Navigate</button><button class="del-btn" onclick="deleteNote(${i})">Delete</button>`);
+        });
+    }
+    window.deleteNote = (i) => { savedNotes.splice(i, 1); localStorage.setItem('murali_final_v10', JSON.stringify(savedNotes)); renderNotes(); };
+    renderNotes();
+
+    // 6. DRAWING & MAGNIFIER LOGIC
+    var drawnItems = new L.FeatureGroup().addTo(map);
+    var drawControl = new L.Control.Draw({ edit: { featureGroup: drawnItems }, draw: { circle: false, circlemarker: false } });
+    map.addControl(drawControl);
+    
+    var isDrawing = false;
+    map.on('draw:drawstart', () => { isDrawing = true; document.getElementById('zoomBox').style.display = 'block'; document.body.classList.add('show-ui'); });
+    map.on('draw:drawstop', () => { isDrawing = false; document.getElementById('zoomBox').style.display = 'none'; showUI(); });
+
+    map.on('mousemove', function(e) { if(isDrawing) { miniMap.setView(e.latlng, map.getZoom() + 3); } });
+
+    map.on(L.Draw.Event.CREATED, (e) => {
+        var layer = e.layer; drawnItems.addLayer(layer);
+        if (e.layerType === 'polygon' || e.layerType === 'rectangle') {
+            var area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+            layer.bindPopup(`<b>Area:</b><br>${(area * 0.000247).toFixed(3)} Acres<br>${(area * 0.0247).toFixed(2)} Cents`).openPopup();
+        }
+        if (e.layerType === 'marker') {
+            var ll = layer.getLatLng(), txt = prompt("Save Note:");
+            if(txt) { savedNotes.push({lat: ll.lat, lng: ll.lng, text: txt}); localStorage.setItem('murali_final_v10', JSON.stringify(savedNotes)); renderNotes(); }
+            map.removeLayer(layer);
+        }
+    });
+
+    // 7. FILE HANDLING (KML/JSON)
+    document.getElementById('uploadFile').onchange = function(e) {
+        var file = e.target.files[0]; if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                if (file.name.endsWith('.kml')) { var k = omnivore.kml.parse(event.target.result).addTo(map); k.on('ready', () => map.fitBounds(k.getBounds())); }
+                else { var j = L.geoJSON(JSON.parse(event.target.result)).addTo(map); map.fitBounds(j.getBounds()); }
+            } catch(err) { alert("Format Error"); }
+        };
+        reader.readAsText(file);
+    };
+
+    // 8. FIXED: UI AUTO FADE / HIDE MANAGEMENT (തൊടാത്ത സമയത്ത് ഹൈഡ് ആകാൻ)
+    var uiTimer; 
+    function showUI() { 
+        if(isDrawing) return; 
+        document.body.classList.add('show-ui'); // കൺട്രോളുകൾ കാണിക്കുന്നു
+        clearTimeout(uiTimer); 
+        // 5 സെക്കൻഡ് സ്ക്രീനിൽ മാറ്റങ്ങൾ ഒന്നും വരുത്തിയില്ലെങ്കിൽ ടൂളുകൾ ഹൈഡ് ചെയ്യും
+        uiTimer = setTimeout(() => { if(!isDrawing) document.body.classList.remove('show-ui'); }, 5000); 
+    }
+    // മാപ്പിൽ ടച്ച് ചെയ്യുമ്പോഴോ ഡ്രാഗ് ചെയ്യുമ്പോഴോ ടൂളുകൾ ദൃശ്യമാകും
+    map.on('mousedown dragstart touchstart zoomstart', showUI);
+
+    function downloadKML() {
+        var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>';
+        drawnItems.eachLayer(l => {
+            kml += '<Placemark><LineString><coordinates>';
+            var c = l.getLatLngs ? (Array.isArray(l.getLatLngs()[0]) ? l.getLatLngs()[0] : l.getLatLngs()) : [l.getLatLng()];
+            c.forEach(p => kml += `${p.lng},${p.lat},0 `);
+            kml += '</coordinates></LineString></Placemark>';
+        });
+        kml += '</Document></kml>';
+        var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([kml])); a.download = "Murali_Traced_Map.kml"; a.click();
+    }
+    showUI();
+</script>
+</body>
+</html>
