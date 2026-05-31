@@ -11,6 +11,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    
     <script src="https://unpkg.com/@mapbox/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -22,10 +25,10 @@
         .village-style { filter: contrast(400%) brightness(50%) saturate(8) hue-rotate(320deg) !important; opacity: 0.9; }
 
         /* UI Control Panel Fading */
-        .leaflet-control-layers, .leaflet-draw, .control-panel, .leaflet-bar, .gps-control, .fmb-bottom-panel {
+        .leaflet-control-layers, .leaflet-draw, .control-panel, .leaflet-bar, .gps-control, .fmb-bottom-panel, .leaflet-control-geocoder {
             opacity: 0; visibility: hidden; transition: opacity 0.6s ease; pointer-events: none;
         }
-        .show-ui .leaflet-control-layers, .show-ui .leaflet-draw, .show-ui .control-panel, .show-ui .leaflet-bar, .show-ui .gps-control, .show-ui .fmb-bottom-panel {
+        .show-ui .leaflet-control-layers, .show-ui .leaflet-draw, .show-ui .control-panel, .show-ui .leaflet-bar, .show-ui .gps-control, .show-ui .fmb-bottom-panel, .show-ui .leaflet-control-geocoder {
             opacity: 1; visibility: visible; pointer-events: auto;
         }
 
@@ -62,7 +65,7 @@
         .nav-btn { background: #28a745; color: white; border: none; padding: 8px; border-radius: 5px; width: 100%; cursor: pointer; margin-top: 5px; font-weight: bold; }
         .del-btn { background: #dc3545; color: white; border: none; padding: 6px; border-radius: 4px; width: 100%; cursor: pointer; margin-top: 5px; font-size: 11px; }
         
-        /* NEW: FMB Georeference Bottom Panel Styling */
+        /* FMB Georeference Bottom Panel Styling */
         .fmb-bottom-panel {
             position: absolute; bottom: 85px; left: 50%; transform: translateX(-50%);
             z-index: 1000; background: rgba(255, 255, 255, 0.96); padding: 12px; border-radius: 16px;
@@ -82,6 +85,9 @@
         .sub-row { display: flex; gap: 4px; }
         .sub-btn { background: #17a2b8; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; }
         .sub-btn:active { background: #117a8b; }
+        
+        /* Touch Edit Active State */
+        .touch-active { border: 2px solid #ffc107; background: rgba(255,193,7,0.1); }
     </style>
 </head>
 <body class="show-ui">
@@ -89,7 +95,7 @@
 <div id="map"></div>
 <div id="zoomBox"></div> 
 
-<div class="fmb-bottom-panel">
+<div class="fmb-bottom-panel" id="fmbPanel">
     <div class="fmb-header">
         <h4>FMB Georeference</h4>
         <label class="btn" style="background: #28a745; font-size: 11px; padding: 6px 10px;">
@@ -98,6 +104,13 @@
     </div>
     
     <div id="fmbTools" style="display: none;">
+        
+        <div class="fmb-control-row" style="margin-bottom: 5px;">
+            <button id="touchToggleBtn" class="btn" style="background: #6c757d; width: 100%; font-size: 12px; justify-content: center;" onclick="toggleFMBTouch()">
+                <i class="fa-solid fa-hand-pointer"></i> Touch Edit: OFF (വിരൽ കൊണ്ട് മാറ്റാൻ)
+            </button>
+        </div>
+
         <div class="fmb-control-row">
             <div class="action-block">
                 <span class="action-label">Move</span>
@@ -138,7 +151,7 @@
                 <span style="font-size:10px; font-weight:bold;">Opacity:</span>
                 <input type="range" id="fmbOpacity" min="0.1" max="1" step="0.1" value="0.6" style="flex-grow:1;">
             </div>
-            <button class="btn" style="background: #dc3545; font-size: 10px; padding: 5px 10px;" onclick="removeFMB()"><i class="fa-solid fa-trash"></i> Remove</button>
+            <button class="btn" style="background: #dc3545; font-size: 10px; padding: 5px 10px;" onclick="removeFMB()"><i class="fa-solid fa-trash"></i></button>
         </div>
     </div>
 </div>
@@ -146,7 +159,7 @@
 <div class="control-panel">
     <button class="btn" onclick="downloadKML()"><i class="fa-solid fa-file-export"></i> Save KML</button>
     <label class="btn" style="background: #6c757d;">
-        <i class="fa-solid fa-file-import"></i> Load KML/JSON <input type="file" id="uploadFile" accept=".kml,.json,.geojson" style="display:none">
+        <i class="fa-solid fa-file-import"></i> Load KML <input type="file" id="uploadFile" accept=".kml,.json,.geojson" style="display:none">
     </label>
 </div>
 
@@ -154,7 +167,7 @@
     // 1. BASE LAYERS
     var gHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
     var gRoad = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
-    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22 });
 
     // 2. WMS LAYERS
     var bhuvanURL = 'https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms';
@@ -167,17 +180,19 @@
     var overlayMaps = { "Village": vLayer, "Cadastral": cLayer };
     var layerControl = L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
 
+    // NEW: Location Search (Geocoder) Added
+    var geocoder = L.Control.geocoder({
+        position: 'topright',
+        defaultMarkGeocode: true
+    }).addTo(map);
+
     var miniMap = L.map('zoomBox', { attributionControl: false, zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false });
     L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] }).addTo(miniMap);
 
-    // --- *** 3. FIXED: SVG OVERLAY LOGIC FOR PERFECT ROTATION & SCALE *** ---
+    // 3. SVG OVERLAY LOGIC
     var fmbSvgOverlay = null;
     var fmbImgDataUrl = "";
-    
-    var fmbLat, fmbLng;
-    var fmbWidth = 0.003;
-    var fmbHeight = 0.003;
-    var fmbAngle = 0;
+    var fmbLat, fmbLng, fmbWidth = 0.003, fmbHeight = 0.003, fmbAngle = 0;
 
     document.getElementById('uploadFMB').onchange = function(e) {
         var file = e.target.files[0];
@@ -186,13 +201,9 @@
         var reader = new FileReader();
         reader.onload = function(event) {
             fmbImgDataUrl = event.target.result;
-            
             var center = map.getCenter();
-            fmbLat = center.lat;
-            fmbLng = center.lng;
-            fmbAngle = 0;
-            fmbWidth = 0.0025;
-            fmbHeight = 0.0025;
+            fmbLat = center.lat; fmbLng = center.lng;
+            fmbAngle = 0; fmbWidth = 0.0025; fmbHeight = 0.0025;
 
             renderSVGOverlay();
             document.getElementById('fmbTools').style.display = 'block';
@@ -201,41 +212,29 @@
         reader.readAsDataURL(file);
     };
 
-    // SVG അധിഷ്ഠിതമായി ചിത്രം റെൻഡർ ചെയ്യുന്നു. ഇത് 100% കൃത്യമായി കറങ്ങും!
     function renderSVGOverlay() {
         if (!fmbImgDataUrl) return;
-
         var sW = L.latLng(fmbLat - (fmbHeight/2), fmbLng - (fmbWidth/2));
         var nE = L.latLng(fmbLat + (fmbHeight/2), fmbLng + (fmbWidth/2));
         var bounds = L.latLngBounds(sW, nE);
 
-        if (fmbSvgOverlay) {
-            map.removeLayer(fmbSvgOverlay);
-        }
+        if (fmbSvgOverlay) map.removeLayer(fmbSvgOverlay);
 
-        // അപ്‌ലോഡ് ചെയ്ത ചിത്രത്തെ ഒരു ഇൻലൈൻ SVG കണ്ടെയ്‌നറിനുള്ളിലാക്കി റൊട്ടേറ്റ് ചെയ്യിക്കുന്നു
         var svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         svgElement.setAttribute('xmlns', "http://www.w3.org/2000/svg");
         svgElement.setAttribute('viewBox', "0 0 100 100");
         
         var svgImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
-        svgImage.setAttribute('width', '100');
-        svgImage.setAttribute('height', '100');
+        svgImage.setAttribute('width', '100'); svgImage.setAttribute('height', '100');
         svgImage.setAttribute('href', fmbImgDataUrl);
-        // മാപ്പ് സൂം ചെയ്താലും ഈ റൊട്ടേഷൻ മാറില്ല
         svgImage.setAttribute('transform', `rotate(${fmbAngle} 50 50)`);
         
         svgElement.appendChild(svgImage);
-
-        fmbSvgOverlay = L.svgOverlay(svgElement, bounds, {
-            opacity: parseFloat(document.getElementById('fmbOpacity').value),
-            interactive: false
-        }).addTo(map);
+        fmbSvgOverlay = L.svgOverlay(svgElement, bounds, { opacity: parseFloat(document.getElementById('fmbOpacity').value), interactive: false }).addTo(map);
     }
 
     window.adjustFMB = function(action) {
         if (!fmbSvgOverlay) return;
-
         var zoomFactor = (22 - map.getZoom());
         var step = 0.000015 * (zoomFactor <= 0 ? 1 : zoomFactor);
 
@@ -248,34 +247,129 @@
             case 'ne':    fmbLat += step; fmbLng += step; break;
             case 'sw':    fmbLat -= step; fmbLng -= step; break;
             case 'se':    fmbLat -= step; fmbLng += step; break;
-            
             case 'zoomin':  fmbWidth *= 1.03; fmbHeight *= 1.03; break;
             case 'zoomout': fmbWidth *= 0.97; fmbHeight *= 0.97; break;
-            
-            // റൊട്ടേഷൻ പ്രശ്നം ഇവിടെ പൂർണ്ണമായി പരിഹരിച്ചു
             case 'rotL':  fmbAngle -= 1.5; break;
             case 'rotR':  fmbAngle += 1.5; break;
         }
-
         renderSVGOverlay();
     };
 
     window.removeFMB = function() {
-        if (fmbSvgOverlay) {
-            map.removeLayer(fmbSvgOverlay);
-            fmbSvgOverlay = null;
-        }
-        fmbImgDataUrl = "";
-        document.getElementById('uploadFMB').value = "";
+        if (fmbSvgOverlay) { map.removeLayer(fmbSvgOverlay); fmbSvgOverlay = null; }
+        fmbImgDataUrl = ""; document.getElementById('uploadFMB').value = "";
         document.getElementById('fmbTools').style.display = 'none';
+        if(fmbTouchEditMode) toggleFMBTouch(); // turn off touch mode if active
     };
 
     document.getElementById('fmbOpacity').addEventListener('input', function(e) {
-        if (fmbSvgOverlay) {
-            fmbSvgOverlay.setOpacity(e.target.value);
-        }
+        if (fmbSvgOverlay) fmbSvgOverlay.setOpacity(e.target.value);
     });
-    // --- *** END SVG OVERLAY LOGIC *** ---
+
+    // --- NEW: FMB PINCH & TOUCH TO MOVE LOGIC ---
+    var fmbTouchEditMode = false;
+    
+    window.toggleFMBTouch = function() {
+        fmbTouchEditMode = !fmbTouchEditMode;
+        var btn = document.getElementById('touchToggleBtn');
+        var panel = document.getElementById('fmbPanel');
+        
+        if(fmbTouchEditMode) {
+            // Disable native map dragging and zooming while editing FMB
+            map.dragging.disable();
+            map.touchZoom.disable();
+            map.scrollWheelZoom.disable();
+            btn.style.background = '#ffc107'; // Yellow active color
+            btn.style.color = '#000';
+            btn.innerHTML = '<i class="fa-solid fa-hand-pointer"></i> Touch Edit: ON (Active)';
+            panel.classList.add('touch-active');
+        } else {
+            // Enable native map interactions
+            map.dragging.enable();
+            map.touchZoom.enable();
+            map.scrollWheelZoom.enable();
+            btn.style.background = '#6c757d';
+            btn.style.color = '#fff';
+            btn.innerHTML = '<i class="fa-solid fa-hand-pointer"></i> Touch Edit: OFF (വിരൽ കൊണ്ട് മാറ്റാൻ)';
+            panel.classList.remove('touch-active');
+        }
+    };
+
+    var touchStartPos = null, startDist = 0, startCenter = null;
+    var startFmbLat = 0, startFmbLng = 0, startFmbW = 0, startFmbH = 0;
+
+    map.getContainer().addEventListener('touchstart', function(e) {
+        if (!fmbTouchEditMode || !fmbSvgOverlay) return;
+        e.preventDefault(); // Prevent accidental scrolling
+        
+        if (e.touches.length === 1) {
+            // 1 Finger (Move)
+            touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            startFmbLat = fmbLat;
+            startFmbLng = fmbLng;
+        } else if (e.touches.length === 2) {
+            // 2 Fingers (Pinch to Zoom & Move simultaneously)
+            var dx = e.touches[0].clientX - e.touches[1].clientX;
+            var dy = e.touches[0].clientY - e.touches[1].clientY;
+            startDist = Math.sqrt(dx*dx + dy*dy);
+            
+            startCenter = {
+                x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+            };
+            startFmbLat = fmbLat; startFmbLng = fmbLng;
+            startFmbW = fmbWidth; startFmbH = fmbHeight;
+        }
+    }, {passive: false});
+
+    map.getContainer().addEventListener('touchmove', function(e) {
+        if (!fmbTouchEditMode || !fmbSvgOverlay) return;
+        e.preventDefault();
+        
+        if (e.touches.length === 1 && touchStartPos) {
+            // 1 Finger Move Processing
+            var dx = e.touches[0].clientX - touchStartPos.x;
+            var dy = e.touches[0].clientY - touchStartPos.y;
+            
+            var p1 = map.latLngToContainerPoint([startFmbLat, startFmbLng]);
+            p1.x += dx; p1.y += dy;
+            var newLatLng = map.containerPointToLatLng(p1);
+            fmbLat = newLatLng.lat; fmbLng = newLatLng.lng;
+            renderSVGOverlay();
+            
+        } else if (e.touches.length === 2 && startDist > 0) {
+            // 2 Finger Pinch & Move Processing
+            var dx = e.touches[0].clientX - e.touches[1].clientX;
+            var dy = e.touches[0].clientY - e.touches[1].clientY;
+            var currentDist = Math.sqrt(dx*dx + dy*dy);
+            
+            // Apply Zoom/Scale
+            var scale = currentDist / startDist;
+            fmbWidth = startFmbW * scale;
+            fmbHeight = startFmbH * scale;
+            
+            // Apply Movement (Panning with 2 fingers)
+            var currentCenter = {
+                x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+            };
+            var cdx = currentCenter.x - startCenter.x;
+            var cdy = currentCenter.y - startCenter.y;
+            
+            var p1 = map.latLngToContainerPoint([startFmbLat, startFmbLng]);
+            p1.x += cdx; p1.y += cdy;
+            var newLatLng = map.containerPointToLatLng(p1);
+            fmbLat = newLatLng.lat; fmbLng = newLatLng.lng;
+            
+            renderSVGOverlay();
+        }
+    }, {passive: false});
+
+    map.getContainer().addEventListener('touchend', function(e) {
+        if (!fmbTouchEditMode) return;
+        touchStartPos = null; startDist = 0;
+    }, {passive: false});
+    // --- END FMB TOUCH LOGIC ---
 
     // 4. CROSSHAIR GPS
     var userMarker, accuracyCircle, isGPS = false;
@@ -353,17 +447,20 @@
         reader.readAsText(file);
     };
 
-    // 8. FIXED: UI AUTO FADE / HIDE MANAGEMENT (തൊടാത്ത സമയത്ത് ഹൈഡ് ആകാൻ)
+    // 8. UI AUTO FADE / HIDE MANAGEMENT
     var uiTimer; 
     function showUI() { 
         if(isDrawing) return; 
-        document.body.classList.add('show-ui'); // കൺട്രോളുകൾ കാണിക്കുന്നു
+        document.body.classList.add('show-ui'); 
         clearTimeout(uiTimer); 
-        // 5 സെക്കൻഡ് സ്ക്രീനിൽ മാറ്റങ്ങൾ ഒന്നും വരുത്തിയില്ലെങ്കിൽ ടൂളുകൾ ഹൈഡ് ചെയ്യും
-        uiTimer = setTimeout(() => { if(!isDrawing) document.body.classList.remove('show-ui'); }, 5000); 
+        uiTimer = setTimeout(() => { if(!isDrawing) document.body.classList.remove('show-ui'); }, 6000); 
     }
-    // മാപ്പിൽ ടച്ച് ചെയ്യുമ്പോഴോ ഡ്രാഗ് ചെയ്യുമ്പോഴോ ടൂളുകൾ ദൃശ്യമാകും
+    
+    // Updated events to keep UI visible while searching/typing
     map.on('mousedown dragstart touchstart zoomstart', showUI);
+    document.addEventListener('mousemove', showUI);
+    document.addEventListener('keydown', showUI);
+    document.addEventListener('touchstart', showUI);
 
     function downloadKML() {
         var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>';
