@@ -6,9 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
 
     <style>
         #map { height: 100vh; width: 100%; position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
@@ -84,7 +85,10 @@
         .cross-v { position: absolute; width: 2px; height: 60px; background: rgba(0, 123, 255, 0.7); }
         .cross-h { position: absolute; width: 60px; height: 2px; background: rgba(0, 123, 255, 0.7); }
 
-        .leaflet-control-layers, .leaflet-draw, .leaflet-control-geocoder { display: none !important; }
+        .leaflet-control-layers, .leaflet-control-geocoder { display: none !important; }
+        
+        /* Hide Default Geoman Controls to use custom ribbon */
+        .leaflet-pm-toolbar { display: none !important; }
     </style>
 </head>
 <body class="show-ui">
@@ -100,15 +104,27 @@
     
     <div class="ribbon-divider"></div>
     
-    <button class="ribbon-btn" id="customLineBtn" title="Draw Line" onclick="triggerLeafletDraw('polyline')">
+    <button class="ribbon-btn" id="customLineBtn" title="Draw Line (Auto-Snap)" onclick="triggerLeafletDraw('Line')">
         <i class="fa-solid fa-file-signature"></i>
     </button>
-    <button class="ribbon-btn" id="customPolygonBtn" title="Draw Polygon" onclick="triggerLeafletDraw('polygon')">
+    <button class="ribbon-btn" id="customPolygonBtn" title="Draw Polygon (Auto-Snap)" onclick="triggerLeafletDraw('Polygon')">
         <i class="fa-solid fa-draw-polygon"></i>
     </button>
-    <button class="ribbon-btn" id="customMarkerBtn" title="Save Note" onclick="triggerLeafletDraw('marker')">
+    <button class="ribbon-btn" id="customMarkerBtn" title="Save Note" onclick="triggerLeafletDraw('Marker')">
         <i class="fa-solid fa-location-dot"></i>
     </button>
+
+    <button class="ribbon-btn" id="customEraseBtn" title="Erase / Delete Drawings" onclick="expandTool('erase')">
+        <i class="fa-solid fa-eraser"></i>
+    </button>
+    <div class="sub-tool-group" id="group-erase">
+        <button class="mini-ribbon-btn" id="eraseModeToggleBtn" title="Touch to Erase" onclick="toggleEraseMode()">
+            <i class="fa-solid fa-hand-pointer"></i>
+        </button>
+        <button class="mini-ribbon-btn" style="background:#dc3545;" title="Clear All Drawings" onclick="clearAllDrawings()">
+            <i class="fa-solid fa-trash-can"></i>
+        </button>
+    </div>
     
     <div class="ribbon-divider"></div>
     
@@ -208,8 +224,9 @@
 <script src="https://unpkg.com/@mapbox/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+
 <script>
-    // Set PDF.js Worker
     var pdfjsLib = window['pdfjs-dist/build/pdf'];
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
@@ -259,30 +276,74 @@
         }
     }
 
-    // 2. DRAWING SYSTEM HANDLERS
+    // 2. UPDATED DRAWING SYSTEM (GEOMAN WITH SNAPPING)
     var drawnItems = new L.FeatureGroup().addTo(map);
-    var drawControl = new L.Control.Draw({ edit: { featureGroup: drawnItems }, draw: { circle: false, circlemarker: false, polyline: {}, polygon: {}, rectangle: {}, marker: {} } });
-    map.addControl(drawControl);
+    
+    // Initialize Geoman Controls (Hide default toolbar)
+    map.pm.addControls({ drawMarker: false, drawPolygon: false, drawPolyline: false, editMode: false, dragMode: false, cutPolygon: false, removalMode: false });
+    
+    // SET GLOBAL SNAPPING OPTIONS
+    map.pm.setGlobalOptions({
+        snappable: true,
+        snapDistance: 25, // Snapping power
+        snapMiddle: true,
+        layerGroup: map 
+    });
     
     function triggerLeafletDraw(toolType) {
-        drawControl._toolbars.draw._modes[toolType].handler.enable();
+        if(map.pm.GlobalDrawMode === toolType) {
+            map.pm.disableDraw();
+        } else {
+            map.pm.enableDraw(toolType);
+        }
+    }
+
+    // ERASE/DELETE DRAWINGS LOGIC
+    var isEraseMode = false;
+    function toggleEraseMode() {
+        map.pm.toggleGlobalRemovalMode();
+        isEraseMode = map.pm.globalRemovalModeEnabled();
+        var btn = document.getElementById('eraseModeToggleBtn');
+        if(isEraseMode) {
+            btn.style.background = '#ffc107'; btn.style.color = '#000';
+            alert("Erase Mode ON: നിങ്ങൾ വരച്ച ലൈനുകളിലോ പോളിഗണുകളിലോ തൊട്ടാൽ അവ മാഞ്ഞുപോകും. ഒഴിവാക്കിയ ശേഷം ഈ ബട്ടൺ വീണ്ടും അമർത്തി OFF ആക്കുക.");
+        } else {
+            btn.style.background = 'rgba(255,255,255,0.2)'; btn.style.color = '#fff';
+        }
+    }
+
+    function clearAllDrawings() {
+        if(confirm("നിങ്ങൾ വരച്ചതെല്ലാം മായ്ച്ചു കളയണോ? (Clear all drawings?)")) {
+            drawnItems.clearLayers();
+            // Remove any direct layers created by geoman
+            map.eachLayer(function(layer){
+                if(layer.pm && layer instanceof L.Path){
+                    map.removeLayer(layer);
+                }
+            });
+        }
     }
 
     var isDrawing = false;
-    map.on('draw:drawstart', () => { isDrawing = true; document.getElementById('zoomBox').style.display = 'block'; document.body.classList.add('show-ui'); });
-    map.on('draw:drawstop', () => { isDrawing = false; document.getElementById('zoomBox').style.display = 'none'; showUI(); });
+    map.on('pm:drawstart', () => { isDrawing = true; document.getElementById('zoomBox').style.display = 'block'; document.body.classList.add('show-ui'); });
+    map.on('pm:drawend', () => { isDrawing = false; document.getElementById('zoomBox').style.display = 'none'; showUI(); });
     map.on('mousemove', function(e) { if(isDrawing) { miniMap.setView(e.latlng, map.getZoom() + 3); } });
 
-    map.on(L.Draw.Event.CREATED, (e) => {
-        var layer = e.layer; drawnItems.addLayer(layer);
-        if (e.layerType === 'polygon' || e.layerType === 'rectangle') {
-            var area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
-            layer.bindPopup(`<b>Area:</b><br>${(area * 0.000247).toFixed(3)} Acres<br>${(area * 0.0247).toFixed(2)} Cents`).openPopup();
-        }
-        if (e.layerType === 'marker') {
+    map.on('pm:create', (e) => {
+        var layer = e.layer; 
+        
+        if (e.shape === 'Marker') {
             var ll = layer.getLatLng(), txt = prompt("Save Note:");
             if(txt) { savedNotes.push({lat: ll.lat, lng: ll.lng, text: txt}); localStorage.setItem('murali_final_v10', JSON.stringify(savedNotes)); renderNotes(); }
-            map.removeLayer(layer);
+            map.removeLayer(layer); // replace with saved marker array
+        } else {
+            drawnItems.addLayer(layer);
+            
+            // Area Calculation Using Leaflet Draw Utility
+            if (e.shape === 'Polygon' || e.shape === 'Rectangle') {
+                var area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+                layer.bindPopup(`<b>Area:</b><br>${(area * 0.000247).toFixed(3)} Acres<br>${(area * 0.0247).toFixed(2)} Cents`).openPopup();
+            }
         }
     });
 
@@ -295,14 +356,13 @@
         var file = e.target.files[0];
         if (!file) return;
 
-        // PDF ഫയൽ ആണെങ്കിൽ അതിനെ ഇമേജ് ആക്കി മാറ്റുന്നു
         if (file.type === 'application/pdf') {
             var fileReader = new FileReader();
             fileReader.onload = function() {
                 var typedarray = new Uint8Array(this.result);
                 pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
                     pdf.getPage(1).then(function(page) {
-                        var viewport = page.getViewport({scale: 2.0}); // High resolution scale
+                        var viewport = page.getViewport({scale: 2.0}); 
                         var canvas = document.createElement('canvas');
                         var context = canvas.getContext('2d');
                         canvas.height = viewport.height;
@@ -316,9 +376,7 @@
                 }).catch(function(err) { alert("PDF Load Error: " + err.message); });
             };
             fileReader.readAsArrayBuffer(file);
-        } 
-        // JPG, PNG ഫയലുകൾ ആണെങ്കിൽ നേരിട്ട് എടുക്കുന്നു
-        else if (file.type.match('image.*')) {
+        } else if (file.type.match('image.*')) {
             var reader = new FileReader();
             reader.onload = function(event) {
                 fmbImgDataUrl = event.target.result;
@@ -328,8 +386,6 @@
         } else {
             alert("ദയവായി JPG, PNG അല്ലെങ്കിൽ PDF ഫയൽ മാത്രം നൽകുക.");
         }
-        
-        // ഒരേ ഫയൽ വീണ്ടും അപ്‌ലോഡ് ചെയ്യാനുള്ള ഫിക്സ്
         e.target.value = ""; 
     };
 
@@ -357,7 +413,6 @@
         var svgImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
         svgImage.setAttribute('width', '100'); 
         svgImage.setAttribute('height', '100');
-        // SVG ബഗ്ഗ് ഫിക്സ് (എല്ലാ ഫോണിലും കാണാൻ)
         svgImage.setAttributeNS("http://www.w3.org/1999/xlink", "href", fmbImgDataUrl); 
         svgImage.setAttribute("href", fmbImgDataUrl);
         svgImage.setAttribute('transform', `rotate(${fmbAngle} 50 50)`);
@@ -368,7 +423,7 @@
 
     function expandTool(toolName) {
         var targetGroup = document.getElementById('group-' + toolName);
-        var mainButtons = ['Move', 'Scale', 'Rotate', 'Opacity', 'Layers'];
+        var mainButtons = ['Move', 'Scale', 'Rotate', 'Opacity', 'Layers', 'Erase'];
         
         mainButtons.forEach(btn => {
             var g = document.getElementById('group-' + btn.toLowerCase());
@@ -548,12 +603,12 @@
         document.body.classList.add('show-ui'); 
         clearTimeout(uiTimer); 
         uiTimer = setTimeout(() => { 
-            if(!isDrawing && !fmbTouchEditMode) document.body.classList.remove('show-ui'); 
+            if(!isDrawing && !fmbTouchEditMode && !isEraseMode) document.body.classList.remove('show-ui'); 
         }, 6000); 
     }
     
     map.on('dragstart zoomstart mousedown touchstart', function() {
-        if(!isDrawing && !fmbTouchEditMode) { document.body.classList.remove('show-ui'); }
+        if(!isDrawing && !fmbTouchEditMode && !isEraseMode) { document.body.classList.remove('show-ui'); }
     });
 
     document.addEventListener('mousemove', showUI);
