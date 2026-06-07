@@ -6,16 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-    
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
-    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-    
-    <script src="https://unpkg.com/@mapbox/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
-    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <style>
@@ -163,6 +155,11 @@
     </label>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+<script src="https://unpkg.com/@mapbox/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
+
 <script>
     // 1. BASE LAYERS
     var gHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
@@ -174,13 +171,14 @@
     var vLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:village', format: 'image/png', transparent: true, className: 'village-style', maxZoom: 22, tileSize: 512, zoomOffset: -1 });
     var cLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:cadastral', format: 'image/png', transparent: true, maxZoom: 22, tileSize: 512, zoomOffset: -1 });
 
-    var map = L.map('map', { center: [11.196, 76.227], zoom: 16, layers: [gHybrid, vLayer], zoomControl: false });
+    // FIXED: tap: false added to solve line drawing bugs on mobile screens
+    var map = L.map('map', { center: [11.196, 76.227], zoom: 16, layers: [gHybrid, vLayer], zoomControl: false, tap: false });
     
     var baseMaps = { "Hybrid": gHybrid, "Road": gRoad, "OSM": osm };
     var overlayMaps = { "Village": vLayer, "Cadastral": cLayer };
     var layerControl = L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
 
-    // NEW: Location Search (Geocoder) Added
+    // Location Search Geocoder Initialization
     var geocoder = L.Control.geocoder({
         position: 'topright',
         defaultMarkGeocode: true
@@ -189,7 +187,7 @@
     var miniMap = L.map('zoomBox', { attributionControl: false, zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false });
     L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] }).addTo(miniMap);
 
-    // 3. SVG OVERLAY LOGIC
+    // 3. SVG OVERLAY LOGIC (FMB)
     var fmbSvgOverlay = null;
     var fmbImgDataUrl = "";
     var fmbLat, fmbLng, fmbWidth = 0.003, fmbHeight = 0.003, fmbAngle = 0;
@@ -259,14 +257,14 @@
         if (fmbSvgOverlay) { map.removeLayer(fmbSvgOverlay); fmbSvgOverlay = null; }
         fmbImgDataUrl = ""; document.getElementById('uploadFMB').value = "";
         document.getElementById('fmbTools').style.display = 'none';
-        if(fmbTouchEditMode) toggleFMBTouch(); // turn off touch mode if active
+        if(fmbTouchEditMode) toggleFMBTouch();
     };
 
     document.getElementById('fmbOpacity').addEventListener('input', function(e) {
         if (fmbSvgOverlay) fmbSvgOverlay.setOpacity(e.target.value);
     });
 
-    // --- NEW: FMB PINCH & TOUCH TO MOVE LOGIC ---
+    // FMB PINCH & TOUCH TO MOVE LOGIC
     var fmbTouchEditMode = false;
     
     window.toggleFMBTouch = function() {
@@ -275,16 +273,14 @@
         var panel = document.getElementById('fmbPanel');
         
         if(fmbTouchEditMode) {
-            // Disable native map dragging and zooming while editing FMB
             map.dragging.disable();
             map.touchZoom.disable();
             map.scrollWheelZoom.disable();
-            btn.style.background = '#ffc107'; // Yellow active color
+            btn.style.background = '#ffc107';
             btn.style.color = '#000';
             btn.innerHTML = '<i class="fa-solid fa-hand-pointer"></i> Touch Edit: ON (Active)';
             panel.classList.add('touch-active');
         } else {
-            // Enable native map interactions
             map.dragging.enable();
             map.touchZoom.enable();
             map.scrollWheelZoom.enable();
@@ -300,25 +296,17 @@
 
     map.getContainer().addEventListener('touchstart', function(e) {
         if (!fmbTouchEditMode || !fmbSvgOverlay) return;
-        e.preventDefault(); // Prevent accidental scrolling
+        e.preventDefault();
         
         if (e.touches.length === 1) {
-            // 1 Finger (Move)
             touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-            startFmbLat = fmbLat;
-            startFmbLng = fmbLng;
+            startFmbLat = fmbLat; startFmbLng = fmbLng;
         } else if (e.touches.length === 2) {
-            // 2 Fingers (Pinch to Zoom & Move simultaneously)
             var dx = e.touches[0].clientX - e.touches[1].clientX;
             var dy = e.touches[0].clientY - e.touches[1].clientY;
             startDist = Math.sqrt(dx*dx + dy*dy);
-            
-            startCenter = {
-                x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-                y: (e.touches[0].clientY + e.touches[1].clientY) / 2
-            };
-            startFmbLat = fmbLat; startFmbLng = fmbLng;
-            startFmbW = fmbWidth; startFmbH = fmbHeight;
+            startCenter = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
+            startFmbLat = fmbLat; startFmbLng = fmbLng; startFmbW = fmbWidth; startFmbH = fmbHeight;
         }
     }, {passive: false});
 
@@ -327,40 +315,27 @@
         e.preventDefault();
         
         if (e.touches.length === 1 && touchStartPos) {
-            // 1 Finger Move Processing
             var dx = e.touches[0].clientX - touchStartPos.x;
             var dy = e.touches[0].clientY - touchStartPos.y;
-            
             var p1 = map.latLngToContainerPoint([startFmbLat, startFmbLng]);
             p1.x += dx; p1.y += dy;
             var newLatLng = map.containerPointToLatLng(p1);
             fmbLat = newLatLng.lat; fmbLng = newLatLng.lng;
             renderSVGOverlay();
-            
         } else if (e.touches.length === 2 && startDist > 0) {
-            // 2 Finger Pinch & Move Processing
             var dx = e.touches[0].clientX - e.touches[1].clientX;
             var dy = e.touches[0].clientY - e.touches[1].clientY;
             var currentDist = Math.sqrt(dx*dx + dy*dy);
-            
-            // Apply Zoom/Scale
             var scale = currentDist / startDist;
-            fmbWidth = startFmbW * scale;
-            fmbHeight = startFmbH * scale;
+            fmbWidth = startFmbW * scale; fmbHeight = startFmbH * scale;
             
-            // Apply Movement (Panning with 2 fingers)
-            var currentCenter = {
-                x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-                y: (e.touches[0].clientY + e.touches[1].clientY) / 2
-            };
+            var currentCenter = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
             var cdx = currentCenter.x - startCenter.x;
             var cdy = currentCenter.y - startCenter.y;
-            
             var p1 = map.latLngToContainerPoint([startFmbLat, startFmbLng]);
             p1.x += cdx; p1.y += cdy;
             var newLatLng = map.containerPointToLatLng(p1);
             fmbLat = newLatLng.lat; fmbLng = newLatLng.lng;
-            
             renderSVGOverlay();
         }
     }, {passive: false});
@@ -369,10 +344,10 @@
         if (!fmbTouchEditMode) return;
         touchStartPos = null; startDist = 0;
     }, {passive: false});
-    // --- END FMB TOUCH LOGIC ---
 
-    // 4. CROSSHAIR GPS
+    // 4. CROSSHAIR GPS LOGIC WITH ADVANCED FALLBACK & AUTO-ZOOM
     var userMarker, accuracyCircle, isGPS = false;
+    var firstGpsFix = true; 
     var crossIcon = L.divIcon({ className: 'blue-dot-container', html: '<div class="cross-v"></div><div class="cross-h"></div><div class="blue-dot"></div>', iconSize: [60, 60], iconAnchor: [30, 30] });
 
     var gpsCtrl = L.Control.extend({
@@ -382,21 +357,84 @@
             btn.innerHTML = '<i class="fa-solid fa-crosshairs"></i>';
             L.DomEvent.on(btn, 'click', (e) => {
                 L.DomEvent.stopPropagation(e);
-                if(!isGPS) { map.locate({setView: true, watch: true, enableHighAccuracy: true}); isGPS = true; btn.classList.add('gps-active'); }
-                else { map.stopLocate(); if(userMarker) map.removeLayer(userMarker); if(accuracyCircle) map.removeLayer(accuracyCircle); userMarker = null; accuracyCircle = null; isGPS = false; btn.classList.remove('gps-active'); }
+                if(!isGPS) { 
+                    firstGpsFix = true; 
+                    isGPS = true; 
+                    btn.classList.add('gps-active');
+                    startLocationTracking();
+                } else { 
+                    stopLocationTracking();
+                    btn.classList.remove('gps-active'); 
+                }
             });
             return btn;
         }
     });
     map.addControl(new gpsCtrl());
 
+    function startLocationTracking() {
+        map.locate({setView: false, watch: true, enableHighAccuracy: true});
+    }
+
+    function stopLocationTracking() {
+        map.stopLocate(); 
+        if(userMarker) map.removeLayer(userMarker); 
+        if(accuracyCircle) map.removeLayer(accuracyCircle); 
+        userMarker = null; accuracyCircle = null; isGPS = false;
+    }
+
     map.on('locationfound', (e) => {
-        map.panTo(e.latlng);
-        if(!userMarker) {
-            userMarker = L.marker(e.latlng, {icon: crossIcon}).addTo(map);
-            accuracyCircle = L.circle(e.latlng, {radius: e.accuracy, color: '#007bff', weight: 1, opacity: 0.3, fillOpacity: 0.05}).addTo(map);
-        } else { userMarker.setLatLng(e.latlng); accuracyCircle.setLatLng(e.latlng).setRadius(e.accuracy); }
+        if(firstGpsFix) {
+            map.setView(e.latlng, 19); // 1:5000 Scale (Zoom 19)
+            firstGpsFix = false;
+        } else {
+            map.panTo(e.latlng); 
+        }
+        updateUserMarker(e.latlng, e.accuracy);
     });
+
+    function updateUserMarker(latlng, accuracy) {
+        if(!userMarker) {
+            userMarker = L.marker(latlng, {icon: crossIcon}).addTo(map);
+            accuracyCircle = L.circle(latlng, {radius: accuracy, color: '#007bff', weight: 1, opacity: 0.3, fillOpacity: 0.05}).addTo(map);
+        } else { 
+            userMarker.setLatLng(latlng); 
+            accuracyCircle.setLatLng(latlng).setRadius(accuracy); 
+        }
+    }
+
+    // FIXED: ബ്രൗസർ സെക്യൂരിറ്റി കാരണം ഫോണിലെ GPS ബ്ലോക്ക് ചെയ്യുമ്പോൾ ഇന്റർനെറ്റ് വഴി ലൊക്കേഷൻ എടുക്കാനുള്ള Fallback സംവിധാനം
+    map.on('locationerror', (e) => {
+        console.log("Browser GPS blocked, trying Internet IP Location...");
+        
+        fetch('https://ipapi.co/json/')
+        .then(response => response.json())
+        .then(data => {
+            if(data.latitude && data.longitude) {
+                var ipLatLng = L.latLng(data.latitude, data.longitude);
+                
+                if(firstGpsFix) {
+                    map.setView(ipLatLng, 16); 
+                    firstGpsFix = false;
+                } else {
+                    map.panTo(ipLatLng);
+                }
+                updateUserMarker(ipLatLng, 1000); 
+                
+                alert("ശ്രദ്ധിക്കുക: ബ്രൗസർ സെക്യൂരിറ്റി കാരണം ഫോണിലെ കൃത്യമായ GPS ലഭ്യമല്ല. ഇപ്പോൾ ഇന്റർനെറ്റ് (IP) വഴിയുള്ള ഏകദേശ ലൊക്കേഷനാണ് കാണിക്കുന്നത്.\n\nകൃത്യമായ ലൈവ് ലൊക്കേഷൻ ലഭിക്കാൻ ഈ ഫയൽ Netlify അല്ലെങ്കിൽ GitHub Pages ലിങ്ക് വഴി തുറക്കുക.");
+            } else {
+                showGpsAlert(e.message);
+            }
+        })
+        .catch(err => {
+            showGpsAlert(e.message);
+        });
+    });
+
+    function showGpsAlert(msg) {
+        alert("GPS പെർമിഷൻ ലഭ്യമല്ല!\n\nகாரണം: " + msg + "\n\nപരിഹാരം:\n1. ഫോണിലെ GPS ഓൺ ആക്കുക.\n2. ബ്രൗസറിന്റെ മുകളിലെ 'Lock' ഐക്കണിൽ ക്ലിക്ക് ചെയ്ത് ലൊക്കേഷൻ Allow ചെയ്യുക.\n3. ഇന്റർനെറ്റിൽ ലിങ്ക് (HTTPS) ആയി അപ്‌ലോഡ് ചെയ്ത് ഉപയോഗിക്കുക.");
+        stopLocationTracking();
+    }
 
     // 5. STORAGE & NOTES
     var pinGroup = L.layerGroup().addTo(map);
@@ -434,7 +472,7 @@
         }
     });
 
-    // 7. FILE HANDLING (KML/JSON)
+    // 7. FILE HANDLING (KML/JSON/GEOJSON)
     document.getElementById('uploadFile').onchange = function(e) {
         var file = e.target.files[0]; if (!file) return;
         var reader = new FileReader();
@@ -456,7 +494,6 @@
         uiTimer = setTimeout(() => { if(!isDrawing) document.body.classList.remove('show-ui'); }, 6000); 
     }
     
-    // Updated events to keep UI visible while searching/typing
     map.on('mousedown dragstart touchstart zoomstart', showUI);
     document.addEventListener('mousemove', showUI);
     document.addEventListener('keydown', showUI);
@@ -477,3 +514,4 @@
 </script>
 </body>
 </html>
+
