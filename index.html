@@ -80,9 +80,9 @@
         .dock-slider { -webkit-appearance: none; width: 32px; height: 4px; background: #555; border-radius: 2px; outline: none; }
         .dock-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #E66100; cursor: pointer; }
 
-        /* FIXED: GPS BLUE DOT AND CROSSHAIR MARKER CSS STYLE */
-        .blue-dot-container { display: flex; align-items: center; justify-content: center; position: relative; }
-        .blue-dot { width: 12px; height: 12px; background: #007bff; border: 2px solid #fff; border-radius: 50%; z-index: 5; box-shadow: 0 0 8px #007bff; }
+        /* FIXED: GPS BLUE DOT AND CROSSHAIR CUSTOM CUSTOM CSS */
+        .blue-dot-container { display: flex !important; align-items: center !important; justify-content: center !important; position: relative !important; }
+        .blue-dot { width: 12px; height: 12px; background: #007bff; border: 2px solid #fff; border-radius: 50%; z-index: 5; box-shadow: 0 0 10px #007bff; }
         .cross-v { position: absolute; width: 2px; height: 60px; background: rgba(0, 123, 255, 0.7); }
         .cross-h { position: absolute; width: 60px; height: 2px; background: rgba(0, 123, 255, 0.7); }
 
@@ -171,7 +171,7 @@
 
         <div class="ribbon-divider"></div>
 
-        <button class="ribbon-btn" id="mainRotateBtn" title="Rotate FMB" onclick="expandTool('rotate')">
+        <button class="dock-btn ribbon-btn" id="mainRotateBtn" title="Rotate FMB" onclick="expandTool('rotate')">
             <span>↻</span>
         </button>
         <div class="sub-tool-group" id="group-rotate">
@@ -181,7 +181,7 @@
 
         <div class="ribbon-divider"></div>
 
-        <button class="ribbon-btn" id="mainOpacityBtn" title="FMB Opacity" onclick="expandTool('opacity')">
+        <button class="dock-btn ribbon-btn" id="mainOpacityBtn" title="FMB Opacity" onclick="expandTool('opacity')">
             <i class="fa-solid fa-eye"></i>
         </button>
         <div class="sub-tool-group" id="group-opacity">
@@ -314,7 +314,7 @@
         var svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         svgElement.setAttribute('xmlns', "http://www.w3.org/2000/svg");
         svgElement.setAttribute('viewBox', "0 0 100 100");
-        var svgImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
+        var svgImage = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         svgImage.setAttribute('width', '100'); svgImage.setAttribute('height', '100');
         svgImage.setAttribute('href', fmbImgDataUrl);
         svgImage.setAttribute('transform', `rotate(${fmbAngle} 50 50)`);
@@ -439,8 +439,8 @@
         touchStartPos = null; startDist = 0;
     }, {passive: false});
 
-    // 4. CROSSHAIR GPS CONTROLLERS
-    var userMarker, accuracyCircle, isGPS = false;
+    // 4. FIXED: CROSSHAIR GPS CONTROLLERS WITH INDEPENDENT MARKER VARIABLE
+    var liveUserMarker = null, accuracyCircle = null, isGPS = false;
     var firstGpsFix = true; 
     var crossIcon = L.divIcon({ className: 'blue-dot-container', html: '<div class="cross-v"></div><div class="cross-h"></div><div class="blue-dot"></div>', iconSize: [60, 60], iconAnchor: [30, 30] });
 
@@ -450,15 +450,17 @@
         else { stopLocationTracking(); btn.classList.remove('gps-btn-active'); }
     }
     function startLocationTracking() { map.locate({setView: false, watch: true, enableHighAccuracy: true}); }
-    function stopLocationTracking() { map.stopLocate(); if(userMarker) map.removeLayer(userMarker); if(accuracyCircle) map.removeLayer(accuracyCircle); userMarker = null; accuracyCircle = null; isGPS = false; }
+    function stopLocationTracking() { map.stopLocate(); if(liveUserMarker) map.removeLayer(liveUserMarker); if(accuracyCircle) map.removeLayer(accuracyCircle); liveUserMarker = null; accuracyCircle = null; isGPS = false; }
 
     map.on('locationfound', (e) => {
         if(firstGpsFix) { map.setView(e.latlng, 19); firstGpsFix = false; }
         else { map.panTo(e.latlng); }
-        if(!userMarker) {
-            userMarker = L.marker(e.latlng, {icon: crossIcon}).addTo(map);
+        
+        // FIXED: liveUserMarker name conflict resolved completely
+        if(!liveUserMarker) {
+            liveUserMarker = L.marker(e.latlng, {icon: crossIcon}).addTo(map);
             accuracyCircle = L.circle(e.latlng, {radius: e.accuracy, color: '#007bff', weight: 1, opacity: 0.3, fillOpacity: 0.05}).addTo(map);
-        } else { userMarker.setLatLng(e.latlng); accuracyCircle.setLatLng(e.latlng).setRadius(e.accuracy); }
+        } else { liveUserMarker.setLatLng(e.latlng); accuracyCircle.setLatLng(e.latlng).setRadius(e.accuracy); }
     });
 
     map.on('locationerror', (e) => {
@@ -466,7 +468,7 @@
             if(data.latitude && data.longitude) {
                 var ipLatLng = L.latLng(data.latitude, data.longitude);
                 if(firstGpsFix) { map.setView(ipLatLng, 16); firstGpsFix = false; } else { map.panTo(ipLatLng); }
-                if(!userMarker) { userMarker = L.marker(ipLatLng, {icon: crossIcon}).addTo(map); } else { userMarker.setLatLng(ipLatLng); }
+                if(!liveUserMarker) { liveUserMarker = L.marker(ipLatLng, {icon: crossIcon}).addTo(map); } else { liveUserMarker.setLatLng(ipLatLng); }
                 alert("ശ്രദ്ധിക്കുക: ബ്രൗസർ സെക്യൂരിറ്റി കാരണം ഫോണിലെ കൃത്യമായ GPS ലഭ്യമല്ല. ഇപ്പോൾ ഇന്റർനെറ്റ് (IP) വഴിയുള്ള ഏകദേശ ലൊക്കേഷനാണ് കാണിക്കുന്നത്.");
             }
         });
