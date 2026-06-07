@@ -264,15 +264,40 @@
         }
     }
 
+    // UPDATED FUNCTION: Now supports Lat, Lng coordinates and location names
     function triggerLocationSearch() {
-        var place = prompt("Enter Village / Location Name:");
+        var place = prompt("Enter Village / Location Name OR Lat, Lng (e.g., 11.196, 76.227):");
         if (place) {
-            hiddenGeocoder.options.geocoder.geocode(place, function(results) {
-                if (results && results.length > 0) {
-                    var firstLatLng = results[0].center;
-                    map.setView(firstLatLng, 16);
-                } else { alert("Location not found!"); }
-            });
+            // Check if input is a Latitude, Longitude pair
+            var coordsMatch = place.match(/^(-?\d+(\.\d+)?)\s*,\s*(-?\d+(\.\d+)?)$/);
+            
+            if (coordsMatch) {
+                // If coordinates are given
+                var lat = parseFloat(coordsMatch[1]);
+                var lng = parseFloat(coordsMatch[3]);
+                
+                // Move map to the coordinates
+                map.setView([lat, lng], 18);
+                
+                // Add a temporary marker to show the exact point
+                var searchMarker = L.marker([lat, lng]).addTo(map)
+                    .bindPopup("<b>Searched Location:</b><br>" + lat + ", " + lng)
+                    .openPopup();
+                    
+                // Remove the marker after 10 seconds automatically (optional)
+                setTimeout(() => map.removeLayer(searchMarker), 10000);
+                
+            } else {
+                // If a place name is given, use the geocoder
+                hiddenGeocoder.options.geocoder.geocode(place, function(results) {
+                    if (results && results.length > 0) {
+                        var firstLatLng = results[0].center;
+                        map.setView(firstLatLng, 16);
+                    } else { 
+                        alert("Location not found!"); 
+                    }
+                });
+            }
         }
     }
 
