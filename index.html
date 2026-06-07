@@ -103,6 +103,10 @@
         <i class="fa-solid fa-location-dot"></i>
     </button>
 
+    <button class="ribbon-btn" id="customEditBtn" title="Edit / Rearrange Drawings" onclick="toggleEditMode()">
+        <i class="fa-solid fa-pen-to-square"></i>
+    </button>
+
     <button class="ribbon-btn" id="customEraseBtn" title="Erase / Delete Drawings" onclick="expandTool('erase')">
         <i class="fa-solid fa-eraser"></i>
     </button>
@@ -294,6 +298,7 @@
 
     function triggerLeafletDraw(toolType) {
         if(isEraseMode) { toggleEraseMode(); }
+        if(isEditMode) { toggleEditMode(); }
         var activeShape = map.pm.Draw.getActiveShape();
         if(activeShape === toolType) {
             map.pm.disableDraw();
@@ -304,8 +309,27 @@
         }
     }
 
+    // DYNAMIC EDIT MODE FOR REARRANGING
+    var isEditMode = false;
+    function toggleEditMode() {
+        if(isEraseMode) { toggleEraseMode(); }
+        map.pm.disableDraw();
+        updateDrawButtons(null);
+
+        map.pm.toggleGlobalEditMode();
+        isEditMode = map.pm.globalEditModeEnabled();
+        var btn = document.getElementById('customEditBtn');
+        if(isEditMode) {
+            btn.classList.add('active-main');
+            alert("Edit Mode ON: Varacha polygon/line-il thodumpol bend point-ukal kaanam. Athu drag cheyth rearrange cheyyaam. Kazhinjitt ee button veendum thott OFF aakkuka.");
+        } else {
+            btn.classList.remove('active-main');
+        }
+    }
+
     var isEraseMode = false;
     function toggleEraseMode() {
+        if(isEditMode) { toggleEditMode(); }
         map.pm.disableDraw();
         updateDrawButtons(null);
         map.pm.toggleGlobalRemovalMode();
@@ -329,6 +353,7 @@
                 if(layer.pm && layer instanceof L.Path){ map.removeLayer(layer); }
             });
             if(isEraseMode) toggleEraseMode(); 
+            if(isEditMode) toggleEditMode();
         }
     }
 
@@ -609,10 +634,10 @@
     function showUI() { 
         document.body.classList.add('show-ui'); 
         clearTimeout(uiTimer); 
-        uiTimer = setTimeout(() => { if(!isDrawing && !fmbTouchEditMode && !isEraseMode) document.body.classList.remove('show-ui'); }, 6000); 
+        uiTimer = setTimeout(() => { if(!isDrawing && !fmbTouchEditMode && !isEraseMode && !isEditMode) document.body.classList.remove('show-ui'); }, 6000); 
     }
     
-    map.on('dragstart zoomstart mousedown touchstart', function() { if(!isDrawing && !fmbTouchEditMode && !isEraseMode) { document.body.classList.remove('show-ui'); } });
+    map.on('dragstart zoomstart mousedown touchstart', function() { if(!isDrawing && !fmbTouchEditMode && !isEraseMode && !isEditMode) { document.body.classList.remove('show-ui'); } });
 
     document.addEventListener('mousemove', showUI);
     document.addEventListener('keydown', showUI);
