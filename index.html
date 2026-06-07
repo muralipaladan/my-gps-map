@@ -272,23 +272,18 @@
             var coordsMatch = place.match(/^(-?\d+(\.\d+)?)\s*,\s*(-?\d+(\.\d+)?)$/);
             
             if (coordsMatch) {
-                // If coordinates are given
                 var lat = parseFloat(coordsMatch[1]);
                 var lng = parseFloat(coordsMatch[3]);
                 
-                // Move map to the coordinates
                 map.setView([lat, lng], 18);
                 
-                // Add a temporary marker to show the exact point
                 var searchMarker = L.marker([lat, lng]).addTo(map)
                     .bindPopup("<b>Searched Location:</b><br>" + lat + ", " + lng)
                     .openPopup();
                     
-                // Remove the marker after 10 seconds automatically (optional)
                 setTimeout(() => map.removeLayer(searchMarker), 10000);
                 
             } else {
-                // If a place name is given, use the geocoder
                 hiddenGeocoder.options.geocoder.geocode(place, function(results) {
                     if (results && results.length > 0) {
                         var firstLatLng = results[0].center;
@@ -314,26 +309,50 @@
         snapMiddle: true,
         layerGroup: map 
     });
-    
+
+    function updateDrawButtons(activeTool) {
+        document.getElementById('customLineBtn').classList.remove('active-main');
+        document.getElementById('customPolygonBtn').classList.remove('active-main');
+        document.getElementById('customMarkerBtn').classList.remove('active-main');
+        
+        if(activeTool === 'Line') document.getElementById('customLineBtn').classList.add('active-main');
+        if(activeTool === 'Polygon') document.getElementById('customPolygonBtn').classList.add('active-main');
+        if(activeTool === 'Marker') document.getElementById('customMarkerBtn').classList.add('active-main');
+    }
+
     function triggerLeafletDraw(toolType) {
-        if(map.pm.GlobalDrawMode === toolType) {
+        if(isEraseMode) { toggleEraseMode(); }
+
+        var activeShape = map.pm.Draw.getActiveShape();
+        
+        if(activeShape === toolType) {
             map.pm.disableDraw();
+            updateDrawButtons(null);
         } else {
             map.pm.enableDraw(toolType);
+            updateDrawButtons(toolType);
         }
     }
 
     // ERASE/DELETE DRAWINGS LOGIC
     var isEraseMode = false;
     function toggleEraseMode() {
+        map.pm.disableDraw();
+        updateDrawButtons(null);
+
         map.pm.toggleGlobalRemovalMode();
         isEraseMode = map.pm.globalRemovalModeEnabled();
+        
         var btn = document.getElementById('eraseModeToggleBtn');
+        var mainEraseBtn = document.getElementById('customEraseBtn');
+        
         if(isEraseMode) {
             btn.style.background = '#ffc107'; btn.style.color = '#000';
-            alert("Erase Mode ON: നിങ്ങൾ വരച്ച ലൈനുകളിലോ പോളിഗണുകളിലോ തൊട്ടാൽ അവ മാഞ്ഞുപോകും. ഒഴിവാക്കിയ ശേഷം ഈ ബട്ടൺ വീണ്ടും അമർത്തി OFF ആക്കുക.");
+            mainEraseBtn.classList.add('active-main');
+            alert("Erase Mode ON: മായ്ക്കാൻ, വരച്ച ലൈനിലോ പോളിഗണിലോ തൊടുക. മായ്ച്ച ശേഷം ഈ ബട്ടൺ വീണ്ടും അമർത്തി OFF ആക്കുക.");
         } else {
             btn.style.background = 'rgba(255,255,255,0.2)'; btn.style.color = '#fff';
+            mainEraseBtn.classList.remove('active-main');
         }
     }
 
@@ -346,8 +365,17 @@
                     map.removeLayer(layer);
                 }
             });
+            if(isEraseMode) toggleEraseMode(); 
         }
     }
+
+    map.on('pm:globaldrawmodetoggled', (e) => {
+        if(!e.enabled) { updateDrawButtons(null); }
+    });
+
+    map.on('pm:remove', (e) => {
+        drawnItems.removeLayer(e.layer);
+    });
 
     var isDrawing = false;
     map.on('pm:drawstart', () => { isDrawing = true; document.getElementById('zoomBox').style.display = 'block'; document.body.classList.add('show-ui'); });
@@ -360,14 +388,20 @@
         if (e.shape === 'Marker') {
             var ll = layer.getLatLng(), txt = prompt("Save Note:");
             if(txt) { savedNotes.push({lat: ll.lat, lng: ll.lng, text: txt}); localStorage.setItem('murali_final_v10', JSON.stringify(savedNotes)); renderNotes(); }
-            map.removeLayer(layer); // replace with saved marker array
+            map.removeLayer(layer); 
+            map.pm.disableDraw(); 
+            updateDrawButtons(null);
         } else {
             drawnItems.addLayer(layer);
             
-            // Area Calculation Using Leaflet Draw Utility
+            // Area Calculation
             if (e.shape === 'Polygon' || e.shape === 'Rectangle') {
-                var area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
-                layer.bindPopup(`<b>Area:</b><br>${(area * 0.000247).toFixed(3)} Acres<br>${(area * 0.0247).toFixed(2)} Cents`).openPopup();
+                try {
+                    var area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+                    layer.bindPopup(`<b>Area:</b><br>${(area * 0.000247).toFixed(3)} Acres<br>${(area * 0.0247).toFixed(2)} Cents`).openPopup();
+                } catch(err) {
+                    console.log("Area calculation error");
+                }
             }
         }
     });
