@@ -33,14 +33,6 @@
             align-items: center;
         }
 
-        /* Magnifier Window */
-        #zoomBox {
-            position: absolute; top: 20px; left: 70px; width: 130px; height: 130px;
-            border: 3px solid #007bff; border-radius: 10px; z-index: 3000;
-            background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            display: none; pointer-events: none; overflow: hidden;
-        }
-
         .btn { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: bold; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
         .nav-btn { background: #28a745; color: white; border: none; padding: 8px; border-radius: 5px; width: 100%; cursor: pointer; margin-top: 5px; font-weight: bold; }
         .del-btn { background: #dc3545; color: white; border: none; padding: 6px; border-radius: 4px; width: 100%; cursor: pointer; margin-top: 5px; font-size: 11px; }
@@ -86,15 +78,12 @@
         .cross-h { position: absolute; width: 60px; height: 2px; background: rgba(0, 123, 255, 0.7); }
 
         .leaflet-control-layers, .leaflet-control-geocoder { display: none !important; }
-        
-        /* Hide Default Geoman Controls to use custom ribbon */
         .leaflet-pm-toolbar { display: none !important; }
     </style>
 </head>
 <body class="show-ui">
 
 <div id="map"></div>
-<div id="zoomBox"></div> 
 
 <div class="ubuntu-unified-ribbon" id="unifiedRibbon">
     
@@ -244,9 +233,6 @@
     var baseLayerGroup = { 'hybrid': gHybrid, 'road': gRoad, 'osm': osm };
     var hiddenGeocoder = L.Control.geocoder({ position: 'topright', defaultMarkGeocode: true }).addTo(map);
 
-    var miniMap = L.map('zoomBox', { attributionControl: false, zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false });
-    L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] }).addTo(miniMap);
-
     function switchBaseLayer(layerKey) {
         for (var key in baseLayerGroup) { map.removeLayer(baseLayerGroup[key]); }
         map.addLayer(baseLayerGroup[layerKey]);
@@ -264,49 +250,36 @@
         }
     }
 
-    // UPDATED FUNCTION: Now supports Lat, Lng coordinates and location names
     function triggerLocationSearch() {
         var place = prompt("Enter Village / Location Name OR Lat, Lng (e.g., 11.196, 76.227):");
         if (place) {
-            // Check if input is a Latitude, Longitude pair
             var coordsMatch = place.match(/^(-?\d+(\.\d+)?)\s*,\s*(-?\d+(\.\d+)?)$/);
-            
             if (coordsMatch) {
                 var lat = parseFloat(coordsMatch[1]);
                 var lng = parseFloat(coordsMatch[3]);
-                
                 map.setView([lat, lng], 18);
-                
-                var searchMarker = L.marker([lat, lng]).addTo(map)
-                    .bindPopup("<b>Searched Location:</b><br>" + lat + ", " + lng)
-                    .openPopup();
-                    
+                var searchMarker = L.marker([lat, lng]).addTo(map).bindPopup(`<b>Searched Coords:</b><br>${lat}, ${lng}`).openPopup();
                 setTimeout(() => map.removeLayer(searchMarker), 10000);
-                
             } else {
                 hiddenGeocoder.options.geocoder.geocode(place, function(results) {
                     if (results && results.length > 0) {
                         var firstLatLng = results[0].center;
                         map.setView(firstLatLng, 16);
-                    } else { 
-                        alert("Location not found!"); 
-                    }
+                    } else { alert("Location not found!"); }
                 });
             }
         }
     }
 
-    // 2. UPDATED DRAWING SYSTEM (GEOMAN WITH SNAPPING)
+    // 2. STABLE DRAWING SYSTEM (GEOMAN PRO SNAPPING & MAP LOCK)
     var drawnItems = new L.FeatureGroup().addTo(map);
-    
-    // Initialize Geoman Controls (Hide default toolbar)
     map.pm.addControls({ drawMarker: false, drawPolygon: false, drawPolyline: false, editMode: false, dragMode: false, cutPolygon: false, removalMode: false });
     
-    // SET GLOBAL SNAPPING OPTIONS
     map.pm.setGlobalOptions({
         snappable: true,
-        snapDistance: 25, // Snapping power
-        snapMiddle: true,
+        snapDistance: 20, 
+        snapMiddle: false, 
+        snapSegment: true,
         layerGroup: map 
     });
 
@@ -314,7 +287,6 @@
         document.getElementById('customLineBtn').classList.remove('active-main');
         document.getElementById('customPolygonBtn').classList.remove('active-main');
         document.getElementById('customMarkerBtn').classList.remove('active-main');
-        
         if(activeTool === 'Line') document.getElementById('customLineBtn').classList.add('active-main');
         if(activeTool === 'Polygon') document.getElementById('customPolygonBtn').classList.add('active-main');
         if(activeTool === 'Marker') document.getElementById('customMarkerBtn').classList.add('active-main');
@@ -322,9 +294,7 @@
 
     function triggerLeafletDraw(toolType) {
         if(isEraseMode) { toggleEraseMode(); }
-
         var activeShape = map.pm.Draw.getActiveShape();
-        
         if(activeShape === toolType) {
             map.pm.disableDraw();
             updateDrawButtons(null);
@@ -334,22 +304,18 @@
         }
     }
 
-    // ERASE/DELETE DRAWINGS LOGIC
     var isEraseMode = false;
     function toggleEraseMode() {
         map.pm.disableDraw();
         updateDrawButtons(null);
-
         map.pm.toggleGlobalRemovalMode();
         isEraseMode = map.pm.globalRemovalModeEnabled();
-        
         var btn = document.getElementById('eraseModeToggleBtn');
         var mainEraseBtn = document.getElementById('customEraseBtn');
-        
         if(isEraseMode) {
             btn.style.background = '#ffc107'; btn.style.color = '#000';
             mainEraseBtn.classList.add('active-main');
-            alert("Erase Mode ON: മായ്ക്കാൻ, വരച്ച ലൈനിലോ പോളിഗണിലോ തൊടുക. മായ്ച്ച ശേഷം ഈ ബട്ടൺ വീണ്ടും അമർത്തി OFF ആക്കുക.");
+            alert("Erase Mode ON: Maaykkan varacha path-il thoduka. Mathiyayathinu shesham ee button OFF aakkuka.");
         } else {
             btn.style.background = 'rgba(255,255,255,0.2)'; btn.style.color = '#fff';
             mainEraseBtn.classList.remove('active-main');
@@ -359,32 +325,44 @@
     function clearAllDrawings() {
         if(confirm("നിങ്ങൾ വരച്ചതെല്ലാം മായ്ച്ചു കളയണോ? (Clear all drawings?)")) {
             drawnItems.clearLayers();
-            // Remove any direct layers created by geoman
             map.eachLayer(function(layer){
-                if(layer.pm && layer instanceof L.Path){
-                    map.removeLayer(layer);
-                }
+                if(layer.pm && layer instanceof L.Path){ map.removeLayer(layer); }
             });
             if(isEraseMode) toggleEraseMode(); 
         }
     }
 
-    map.on('pm:globaldrawmodetoggled', (e) => {
-        if(!e.enabled) { updateDrawButtons(null); }
-    });
-
-    map.on('pm:remove', (e) => {
-        drawnItems.removeLayer(e.layer);
-    });
+    map.on('pm:globaldrawmodetoggled', (e) => { if(!e.enabled) { updateDrawButtons(null); } });
+    map.on('pm:remove', (e) => { drawnItems.removeLayer(e.layer); });
 
     var isDrawing = false;
-    map.on('pm:drawstart', () => { isDrawing = true; document.getElementById('zoomBox').style.display = 'block'; document.body.classList.add('show-ui'); });
-    map.on('pm:drawend', () => { isDrawing = false; document.getElementById('zoomBox').style.display = 'none'; showUI(); });
-    map.on('mousemove', function(e) { if(isDrawing) { miniMap.setView(e.latlng, map.getZoom() + 3); } });
+    
+    map.on('pm:drawstart', () => { 
+        isDrawing = true; 
+        document.body.classList.add('show-ui'); 
+        
+        // LOCK MAP DRAGGING AND ZOOMING
+        map.dragging.disable(); 
+        map.touchZoom.disable(); 
+        map.scrollWheelZoom.disable(); 
+        map.doubleClickZoom.disable(); 
+    });
+
+    map.on('pm:drawend', () => { 
+        isDrawing = false; 
+        showUI(); 
+        
+        // UNLOCK MAP CONTROL
+        if(!fmbTouchEditMode) {
+            map.dragging.enable(); 
+            map.touchZoom.enable(); 
+            map.scrollWheelZoom.enable(); 
+            map.doubleClickZoom.enable();
+        }
+    });
 
     map.on('pm:create', (e) => {
         var layer = e.layer; 
-        
         if (e.shape === 'Marker') {
             var ll = layer.getLatLng(), txt = prompt("Save Note:");
             if(txt) { savedNotes.push({lat: ll.lat, lng: ll.lng, text: txt}); localStorage.setItem('murali_final_v10', JSON.stringify(savedNotes)); renderNotes(); }
@@ -393,15 +371,11 @@
             updateDrawButtons(null);
         } else {
             drawnItems.addLayer(layer);
-            
-            // Area Calculation
             if (e.shape === 'Polygon' || e.shape === 'Rectangle') {
                 try {
                     var area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
                     layer.bindPopup(`<b>Area:</b><br>${(area * 0.000247).toFixed(3)} Acres<br>${(area * 0.0247).toFixed(2)} Cents`).openPopup();
-                } catch(err) {
-                    console.log("Area calculation error");
-                }
+                } catch(err) { console.log(err); }
             }
         }
     });
@@ -414,7 +388,6 @@
     document.getElementById('uploadFMB').onchange = function(e) {
         var file = e.target.files[0];
         if (!file) return;
-
         if (file.type === 'application/pdf') {
             var fileReader = new FileReader();
             fileReader.onload = function() {
@@ -437,21 +410,15 @@
             fileReader.readAsArrayBuffer(file);
         } else if (file.type.match('image.*')) {
             var reader = new FileReader();
-            reader.onload = function(event) {
-                fmbImgDataUrl = event.target.result;
-                initFMBLayer();
-            };
+            reader.onload = function(event) { fmbImgDataUrl = event.target.result; initFMBLayer(); };
             reader.readAsDataURL(file);
-        } else {
-            alert("ദയവായി JPG, PNG അല്ലെങ്കിൽ PDF ഫയൽ മാത്രം നൽകുക.");
-        }
+        } else { alert("ദയവായി JPG, PNG അല്ലെങ്കിൽ PDF ഫയൽ മാത്രം നൽകുക."); }
         e.target.value = ""; 
     };
 
     function initFMBLayer() {
         var center = map.getCenter();
-        fmbLat = center.lat; fmbLng = center.lng;
-        fmbAngle = 0; fmbWidth = 0.0025; fmbHeight = 0.0025;
+        fmbLat = center.lat; fmbLng = center.lng; fmbAngle = 0; fmbWidth = 0.0025; fmbHeight = 0.0025;
         renderSVGOverlay();
         document.getElementById('fmbTools').style.display = 'flex';
         showUI();
@@ -462,7 +429,6 @@
         var sW = L.latLng(fmbLat - (fmbHeight/2), fmbLng - (fmbWidth/2));
         var nE = L.latLng(fmbLat + (fmbHeight/2), fmbLng + (fmbWidth/2));
         var bounds = L.latLngBounds(sW, nE);
-        
         if (fmbSvgOverlay) map.removeLayer(fmbSvgOverlay);
         
         var svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -470,8 +436,7 @@
         svgElement.setAttribute('viewBox', "0 0 100 100");
         
         var svgImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
-        svgImage.setAttribute('width', '100'); 
-        svgImage.setAttribute('height', '100');
+        svgImage.setAttribute('width', '100'); svgImage.setAttribute('height', '100');
         svgImage.setAttributeNS("http://www.w3.org/1999/xlink", "href", fmbImgDataUrl); 
         svgImage.setAttribute("href", fmbImgDataUrl);
         svgImage.setAttribute('transform', `rotate(${fmbAngle} 50 50)`);
@@ -483,16 +448,11 @@
     function expandTool(toolName) {
         var targetGroup = document.getElementById('group-' + toolName);
         var mainButtons = ['Move', 'Scale', 'Rotate', 'Opacity', 'Layers', 'Erase'];
-        
         mainButtons.forEach(btn => {
             var g = document.getElementById('group-' + btn.toLowerCase());
             var b = document.getElementById('main' + btn + 'Btn') || document.getElementById('custom' + btn + 'Btn');
-            if (btn.toLowerCase() !== toolName) {
-                if(g) g.style.display = 'none';
-                if(b) b.classList.remove('active-main');
-            }
+            if (btn.toLowerCase() !== toolName) { if(g) g.style.display = 'none'; if(b) b.classList.remove('active-main'); }
         });
-
         if (targetGroup.style.display === 'flex') {
             targetGroup.style.display = 'none';
             var currentBtn = document.getElementById('main' + toolName.charAt(0).toUpperCase() + toolName.slice(1) + 'Btn') || document.getElementById('custom' + toolName.charAt(0).toUpperCase() + toolName.slice(1) + 'Btn');
@@ -570,32 +530,22 @@
         if (e.touches.length === 1 && touchStartPos) {
             var dx = e.touches[0].clientX - touchStartPos.x;
             var dy = e.touches[0].clientY - touchStartPos.y;
-            var p1 = map.latLngToContainerPoint([startFmbLat, startFmbLng]);
-            p1.x += dx; p1.y += dy;
-            var newLatLng = map.containerPointToLatLng(p1);
-            fmbLat = newLatLng.lat; fmbLng = newLatLng.lng;
+            var p1 = map.latLngToContainerPoint([startFmbLat, startFmbLng]); p1.x += dx; p1.y += dy;
+            var newLatLng = map.containerPointToLatLng(p1); fmbLat = newLatLng.lat; fmbLng = newLatLng.lng;
             renderSVGOverlay();
         } else if (e.touches.length === 2 && startDist > 0) {
-            var dx = e.touches[0].clientX - e.touches[1].clientX;
-            var dy = e.touches[0].clientY - e.touches[1].clientY;
-            var currentDist = Math.sqrt(dx*dx + dy*dy);
-            var scale = currentDist / startDist;
+            var dx = e.touches[0].clientX - e.touches[1].clientX; var dy = e.touches[0].clientY - e.touches[1].clientY;
+            var currentDist = Math.sqrt(dx*dx + dy*dy); var scale = currentDist / startDist;
             fmbWidth = startFmbW * scale; fmbHeight = startFmbH * scale;
             var currentCenter = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
-            var cdx = currentCenter.x - startCenter.x;
-            var cdy = currentCenter.y - startCenter.y;
-            var p1 = map.latLngToContainerPoint([startFmbLat, startFmbLng]);
-            p1.x += cdx; p1.y += cdy;
-            var newLatLng = map.containerPointToLatLng(p1);
-            fmbLat = newLatLng.lat; fmbLng = newLatLng.lng;
+            var cdx = currentCenter.x - startCenter.x; var cdy = currentCenter.y - startCenter.y;
+            var p1 = map.latLngToContainerPoint([startFmbLat, startFmbLng]); p1.x += cdx; p1.y += cdy;
+            var newLatLng = map.containerPointToLatLng(p1); fmbLat = newLatLng.lat; fmbLng = newLatLng.lng;
             renderSVGOverlay();
         }
     }, {passive: false});
 
-    map.getContainer().addEventListener('touchend', function(e) {
-        if (!fmbTouchEditMode) return;
-        touchStartPos = null; startDist = 0;
-    }, {passive: false});
+    map.getContainer().addEventListener('touchend', function(e) { if (!fmbTouchEditMode) return; touchStartPos = null; startDist = 0; }, {passive: false});
 
     // 4. CROSSHAIR GPS CONTROLLERS
     var liveUserMarker = null, accuracyCircle = null, isGPS = false;
@@ -611,9 +561,7 @@
     function stopLocationTracking() { map.stopLocate(); if(liveUserMarker) map.removeLayer(liveUserMarker); if(accuracyCircle) map.removeLayer(accuracyCircle); liveUserMarker = null; accuracyCircle = null; isGPS = false; }
 
     map.on('locationfound', (e) => {
-        if(firstGpsFix) { map.setView(e.latlng, 19); firstGpsFix = false; }
-        else { map.panTo(e.latlng); }
-        
+        if(firstGpsFix) { map.setView(e.latlng, 19); firstGpsFix = false; } else { map.panTo(e.latlng); }
         if(!liveUserMarker) {
             liveUserMarker = L.marker(e.latlng, {icon: crossIcon}).addTo(map);
             accuracyCircle = L.circle(e.latlng, {radius: e.accuracy, color: '#007bff', weight: 1, opacity: 0.3, fillOpacity: 0.05}).addTo(map);
@@ -637,7 +585,7 @@
     function renderNotes() {
         pinGroup.clearLayers();
         savedNotes.forEach((p, i) => {
-            L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(`<b>Note:</b><br>${p.text}<br><button class="nav-btn" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}')">Navigate</button><button class="del-btn" onclick="deleteNote(${i})">Delete</button>`);
+            L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(`<b>Note:</b><br>${p.text}<br><button class="nav-btn" onclick="window.open('http://maps.google.com/maps?q=${p.lat},${p.lng}')">Navigate</button><button class="del-btn" onclick="deleteNote(${i})">Delete</button>`);
         });
     }
     window.deleteNote = (i) => { savedNotes.splice(i, 1); localStorage.setItem('murali_final_v10', JSON.stringify(savedNotes)); renderNotes(); };
@@ -661,14 +609,10 @@
     function showUI() { 
         document.body.classList.add('show-ui'); 
         clearTimeout(uiTimer); 
-        uiTimer = setTimeout(() => { 
-            if(!isDrawing && !fmbTouchEditMode && !isEraseMode) document.body.classList.remove('show-ui'); 
-        }, 6000); 
+        uiTimer = setTimeout(() => { if(!isDrawing && !fmbTouchEditMode && !isEraseMode) document.body.classList.remove('show-ui'); }, 6000); 
     }
     
-    map.on('dragstart zoomstart mousedown touchstart', function() {
-        if(!isDrawing && !fmbTouchEditMode && !isEraseMode) { document.body.classList.remove('show-ui'); }
-    });
+    map.on('dragstart zoomstart mousedown touchstart', function() { if(!isDrawing && !fmbTouchEditMode && !isEraseMode) { document.body.classList.remove('show-ui'); } });
 
     document.addEventListener('mousemove', showUI);
     document.addEventListener('keydown', showUI);
