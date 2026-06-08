@@ -18,13 +18,32 @@
         /* Custom WMS Style for contrast */
         .wms-style-force { filter: contrast(400%) brightness(50%) saturate(8) hue-rotate(320deg) !important; opacity: 0.9; }
 
-        /* Smooth Ribbon Fading on Map Activity */
-        .ubuntu-unified-ribbon, .control-panel {
+        /* Smooth Ribbon & Search Fading on Map Activity */
+        .ubuntu-unified-ribbon, .control-panel, .search-container {
             opacity: 0; visibility: hidden; transition: opacity 0.3s ease, transform 0.3s ease;
         }
-        .show-ui .ubuntu-unified-ribbon, .show-ui .control-panel {
+        .show-ui .ubuntu-unified-ribbon, .show-ui .control-panel, .show-ui .search-container {
             opacity: 1; visibility: visible; pointer-events: auto;
         }
+
+        /* INDEPENDENT FLOATING SEARCH BAR */
+        .search-container {
+            position: absolute; top: 15px; left: 70px; z-index: 2000;
+            display: flex; background: rgba(22, 22, 22, 0.96); padding: 5px;
+            border-radius: 10px; border: 1px solid rgba(255,255,255,0.15);
+            box-shadow: 0 4px 25px rgba(0,0,0,0.6);
+        }
+        .search-container input {
+            background: rgba(255, 255, 255, 0.1); border: none; color: #fff;
+            padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none; width: 220px;
+        }
+        .search-container input::placeholder { color: #bbb; }
+        .search-container button {
+            background: #E66100; color: white; border: none; margin-left: 6px;
+            padding: 0 14px; border-radius: 6px; cursor: pointer; font-size: 14px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .search-container button:active { background: #cc5200; }
 
         /* Bottom Save/Load Panel */
         .control-panel {
@@ -36,7 +55,7 @@
 
         /* Magnifier Window */
         #zoomBox {
-            position: absolute; top: 20px; left: 70px; width: 130px; height: 130px;
+            position: absolute; top: 75px; left: 70px; width: 130px; height: 130px;
             border: 3px solid #007bff; border-radius: 10px; z-index: 3000;
             background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
             display: none; pointer-events: none; overflow: hidden;
@@ -95,6 +114,11 @@
 <div id="map"></div>
 <div id="zoomBox"></div> 
 
+<div class="search-container">
+    <input type="text" id="searchInput" placeholder="Village Name or Lat, Lng...">
+    <button onclick="executeLocationSearch()" title="Search Location"><i class="fa-solid fa-magnifying-glass"></i></button>
+</div>
+
 <div class="ubuntu-unified-ribbon" id="unifiedRibbon">
     
     <button class="ribbon-btn" id="customGpsBtn" title="Live GPS Location" onclick="toggleGpsService()">
@@ -142,12 +166,6 @@
         <button class="mini-ribbon-btn" id="layerToggleVillage" title="Toggle Village WMS" onclick="toggleWmsOverlay('village')" style="background:#ffc107; color:#000;">V</button>
         <button class="mini-ribbon-btn" id="layerToggleCadastral" title="Toggle Cadastral WMS" onclick="toggleWmsOverlay('cadastral')">C</button>
     </div>
-    
-    <div class="ribbon-divider"></div>
-    
-    <button class="ribbon-btn" id="customSearchBtn" title="Search Location / Coordinates" onclick="triggerLocationSearch()">
-        <i class="fa-solid fa-magnifying-glass"></i>
-    </button>
     
     <div class="ribbon-divider"></div>
 
@@ -239,7 +257,7 @@
 
     var map = L.map('map', { center: [11.196, 76.227], zoom: 16, layers: [gHybrid], zoomControl: false, tap: false });
     
-    // HIGH-PRIORITY CADASTRAL PANE (No interference during tracing/georeferencing)
+    // HIGH-PRIORITY CADASTRAL PANE
     map.createPane('cadastralPane');
     map.getPane('cadastralPane').style.zIndex = 600; 
     map.getPane('cadastralPane').style.pointerEvents = 'none';
@@ -249,9 +267,7 @@
     var cLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:cadastral', format: 'image/png', transparent: true, maxZoom: 22, tileSize: 512, zoomOffset: -1, pane: 'cadastralPane' });
 
     map.addLayer(vLayer);
-
     var baseLayerGroup = { 'hybrid': gHybrid, 'road': gRoad, 'osm': osm };
-    var hiddenGeocoder = L.Control.geocoder({ position: 'topright', defaultMarkGeocode: true }).addTo(map);
 
     // MAGNIFIER MIRROR SETUP
     var miniMap = L.map('zoomBox', { attributionControl: false, zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false });
@@ -290,30 +306,55 @@
         }
     }
 
-    // UPDATED ADVANCED SEARCH LOGIC (Supports Place Name & Lat/Lng Coordinates)
-    function triggerLocationSearch() {
-        var input = prompt("Enter Village/Place Name OR Coordinates (Lat, Lng):");
-        if (input) {
-            // Check if input format matches coordinates like "11.196, 76.227" or "11.196 76.227"
-            var parts = input.trim().split(/[\s,]+/);
-            if (parts.length === 2) {
-                var lat = parseFloat(parts[0]);
-                var lng = parseFloat(parts[1]);
-                if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-                    map.setView([lat, lng], 19); // High zoom factor for specific coordinates
-                    return;
-                }
-            }
-            
-            // Otherwise execute standard text geocoding
-            hiddenGeocoder.options.geocoder.geocode(input, function(results) {
-                if (results && results.length > 0) {
-                    var firstLatLng = results[0].center;
-                    map.setView(firstLatLng, 16);
-                } else { alert("Location or Coordinates not found!"); }
-            });
+    // --- GOOGLE MAPS STYLE LOCATION SEARCH WITH MARKER ---
+    var currentSearchMarker = null;
+
+    function executeLocationSearch() {
+        var input = document.getElementById('searchInput').value;
+        if (!input) return;
+
+        // പഴയ സെർച്ച് മാർക്കർ കളയാൻ
+        if (currentSearchMarker) {
+            map.removeLayer(currentSearchMarker);
+            currentSearchMarker = null;
         }
+
+        // 1. കോർഡിനേറ്റ് ആണ് നൽകിയതെങ്കിൽ (Coordinates Search)
+        var parts = input.trim().split(/[\s,]+/);
+        if (parts.length === 2) {
+            var lat = parseFloat(parts[0]);
+            var lng = parseFloat(parts[1]);
+            if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                map.setView([lat, lng], 19); 
+                currentSearchMarker = L.marker([lat, lng]).addTo(map)
+                    .bindPopup(`<b>Searched Location</b><br>Lat: ${lat}<br>Lng: ${lng}`)
+                    .openPopup();
+                return; 
+            }
+        }
+        
+        // 2. സ്ഥലത്തിന്റെ പേരാണ് നൽകിയതെങ്കിൽ (Place Name Search using Nominatim Geocoder)
+        var geocoder = L.Control.Geocoder.nominatim();
+        geocoder.geocode(input, function(results) {
+            if (results && results.length > 0) {
+                var bestResult = results[0];
+                map.fitBounds(bestResult.bbox); // കൃത്യമായി ആ സ്ഥലത്തേക്ക് സൂം ചെയ്യാൻ
+                
+                currentSearchMarker = L.marker(bestResult.center).addTo(map)
+                    .bindPopup(`<b>${bestResult.name}</b>`)
+                    .openPopup();
+            } else { 
+                alert("സ്ഥലം കണ്ടെത്താനായില്ല! അക്ഷരതെറ്റ് ഉണ്ടോ എന്ന് പരിശോധിക്കുക."); 
+            }
+        });
     }
+
+    // Enter ബട്ടൺ അമർത്തിയാലും സെർച്ച് ആകാൻ 
+    document.getElementById('searchInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            executeLocationSearch();
+        }
+    });
 
     // 2. DRAWING SYSTEM (GEOMAN FREE WITH SNAPPING & REARRANGE EDIT INTERFACE)
     var drawnItems = new L.FeatureGroup().addTo(map);
