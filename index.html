@@ -145,7 +145,7 @@
     
     <div class="ribbon-divider"></div>
     
-    <button class="ribbon-btn" id="customSearchBtn" title="Search Location" onclick="triggerLocationSearch()">
+    <button class="ribbon-btn" id="customSearchBtn" title="Search Location / Coordinates" onclick="triggerLocationSearch()">
         <i class="fa-solid fa-magnifying-glass"></i>
     </button>
     
@@ -239,9 +239,9 @@
 
     var map = L.map('map', { center: [11.196, 76.227], zoom: 16, layers: [gHybrid], zoomControl: false, tap: false });
     
-    // CREATE CUSTOM HIGH-PRIORITY PANES WITH FORCED CLICK-THROUGH (pointer-events: none)
+    // HIGH-PRIORITY CADASTRAL PANE (No interference during tracing/georeferencing)
     map.createPane('cadastralPane');
-    map.getPane('cadastralPane').style.zIndex = 600; // Absolute top position over vector drawings
+    map.getPane('cadastralPane').style.zIndex = 600; 
     map.getPane('cadastralPane').style.pointerEvents = 'none';
 
     var bhuvanURL = 'https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms';
@@ -257,7 +257,6 @@
     var miniMap = L.map('zoomBox', { attributionControl: false, zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false });
     L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] }).addTo(miniMap);
     
-    // Create high priority pane inside mini map too
     miniMap.createPane('cadastralPaneMini');
     miniMap.getPane('cadastralPaneMini').style.zIndex = 600;
     miniMap.getPane('cadastralPaneMini').style.pointerEvents = 'none';
@@ -291,14 +290,27 @@
         }
     }
 
+    // UPDATED ADVANCED SEARCH LOGIC (Supports Place Name & Lat/Lng Coordinates)
     function triggerLocationSearch() {
-        var place = prompt("Enter Village / Location Name:");
-        if (place) {
-            hiddenGeocoder.options.geocoder.geocode(place, function(results) {
+        var input = prompt("Enter Village/Place Name OR Coordinates (Lat, Lng):");
+        if (input) {
+            // Check if input format matches coordinates like "11.196, 76.227" or "11.196 76.227"
+            var parts = input.trim().split(/[\s,]+/);
+            if (parts.length === 2) {
+                var lat = parseFloat(parts[0]);
+                var lng = parseFloat(parts[1]);
+                if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                    map.setView([lat, lng], 19); // High zoom factor for specific coordinates
+                    return;
+                }
+            }
+            
+            // Otherwise execute standard text geocoding
+            hiddenGeocoder.options.geocoder.geocode(input, function(results) {
                 if (results && results.length > 0) {
                     var firstLatLng = results[0].center;
                     map.setView(firstLatLng, 16);
-                } else { alert("Location not found!"); }
+                } else { alert("Location or Coordinates not found!"); }
             });
         }
     }
@@ -468,7 +480,6 @@
         svgImage.setAttribute('transform', `rotate(${fmbAngle} 50 50)`);
         svgElement.appendChild(svgImage);
         
-        // standard overlay overlayPane sits perfectly under our custom high-priority cadastralPane
         fmbSvgOverlay = L.svgOverlay(svgElement, bounds, { pane: 'overlayPane', opacity: parseFloat(document.getElementById('fmbOpacity').value), interactive: false }).addTo(map);
         
         var svgClone = svgElement.cloneNode(true);
