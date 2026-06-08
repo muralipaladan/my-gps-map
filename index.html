@@ -306,17 +306,15 @@
         }
     }
 
-    // --- NEW SEARCH LOGIC ---
+    // --- SEARCH LOGIC ---
     var currentSearchMarker = null;
 
     function executeLocationSearch() {
         var input = document.getElementById('searchInput').value;
         if (!input) return;
 
-        // പഴയ marker delete cheyyaan
         if (currentSearchMarker) map.removeLayer(currentSearchMarker);
 
-        // Coordinates check cheyyaan
         var parts = input.trim().split(/[\s,]+/);
         if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
             var lat = parseFloat(parts[0]), lng = parseFloat(parts[1]);
@@ -325,7 +323,6 @@
             return;
         }
 
-        // Place Name search (Nominatim)
         var url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(input);
         fetch(url)
             .then(response => response.json())
@@ -346,26 +343,49 @@
             .catch(err => alert("Search error. Check internet."));
     }
 
-    // Enter ബട്ടൺ അമർത്തിയാലും സെർച്ച് ആകാൻ (Added back for better UI)
     document.getElementById('searchInput').addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
             executeLocationSearch();
         }
     });
 
-    // 2. DRAWING SYSTEM (GEOMAN FREE WITH SNAPPING & REARRANGE EDIT INTERFACE)
+    // 2. DRAWING SYSTEM (GEOMAN FREE WITH SNAPPING & REARRANGE EDIT INTERFACE & HIGHLIGHT)
     var drawnItems = new L.FeatureGroup().addTo(map);
     var vectorMap = {};
 
     map.pm.addControls({ drawMarker: false, drawPolygon: false, drawPolyline: false, editMode: false, dragMode: false, cutPolygon: false, removalMode: false });
     map.pm.setGlobalOptions({ snappable: true, snapDistance: 25, snapMiddle: true, layerGroup: map });
     
+    // ടൂളുകളുടെ ഹൈലൈറ്റ് മാറ്റാൻ
+    function clearDrawHighlights() {
+        document.getElementById('customLineBtn').classList.remove('active-main');
+        document.getElementById('customPolygonBtn').classList.remove('active-main');
+        document.getElementById('customMarkerBtn').classList.remove('active-main');
+    }
+
     function triggerLeafletDraw(toolType) {
         if (isEditing) toggleEditMode();
         if (isEraseMode) toggleEraseMode();
-        if(map.pm.GlobalDrawMode === toolType) { map.pm.disableDraw(); } 
-        else { map.pm.enableDraw(toolType); }
+
+        var wasActive = (map.pm.GlobalDrawMode === toolType);
+        
+        clearDrawHighlights(); // പഴയ ടൂളിന്റെ ഹൈലൈറ്റ് മാറ്റുന്നു
+
+        if (wasActive) {
+            map.pm.disableDraw();
+        } else {
+            map.pm.enableDraw(toolType);
+            // സെലക്ട് ചെയ്ത പുതിയ ടൂൾ ഓറഞ്ച് നിറത്തിൽ Highlight ചെയ്യുന്നു
+            document.getElementById('custom' + toolType + 'Btn').classList.add('active-main');
+        }
     }
+
+    // വരയ്ക്കുന്നത് ക്യാൻസൽ ആയാൽ Highlight തനിയെ പോകാൻ
+    map.on('pm:globaldrawmodetoggled', (e) => {
+        if (!e.enabled) {
+            clearDrawHighlights();
+        }
+    });
 
     var isEraseMode = false;
     function toggleEraseMode() {
