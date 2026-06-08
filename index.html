@@ -15,7 +15,8 @@
         #map { height: 100vh; width: 100%; position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
         body { margin: 0; padding: 0; font-family: sans-serif; overflow: hidden; background: #000; }
         
-        .village-style { filter: contrast(400%) brightness(50%) saturate(8) hue-rotate(320deg) !important; opacity: 0.9; }
+        /* Custom WMS Style for contrast */
+        .wms-style-force { filter: contrast(400%) brightness(50%) saturate(8) hue-rotate(320deg) !important; opacity: 0.9; }
 
         /* Smooth Ribbon Fading on Map Activity */
         .ubuntu-unified-ribbon, .control-panel {
@@ -110,6 +111,10 @@
     </button>
     <button class="ribbon-btn" id="customMarkerBtn" title="Save Note" onclick="triggerLeafletDraw('Marker')">
         <i class="fa-solid fa-location-dot"></i>
+    </button>
+
+    <button class="ribbon-btn" id="customEditBtn" title="Edit / Rearrange Polygons" onclick="toggleEditMode()">
+        <i class="fa-solid fa-pen-to-square"></i>
     </button>
 
     <button class="ribbon-btn" id="customEraseBtn" title="Erase / Delete Drawings" onclick="expandTool('erase')">
@@ -221,7 +226,6 @@
 <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 <script src="https://unpkg.com/@mapbox/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
 
 <script>
@@ -235,24 +239,36 @@
 
     var map = L.map('map', { center: [11.196, 76.227], zoom: 16, layers: [gHybrid], zoomControl: false, tap: false });
     
-    // CREATE CUSTOM HIGH-PRIORITY PANE FOR CADASTRAL / VILLAGE LAYERS
+    // CREATE CUSTOM HIGH-PRIORITY PANES WITH FORCED CLICK-THROUGH (pointer-events: none)
     map.createPane('cadastralPane');
-    map.getPane('cadastralPane').style.zIndex = 450; // Higher than standard vector overlays (400)
-    map.getPane('cadastralPane').style.pointerEvents = 'none'; // Critical: allows clicking/dragging elements beneath it
+    map.getPane('cadastralPane').style.zIndex = 600; // Absolute top position over vector drawings
+    map.getPane('cadastralPane').style.pointerEvents = 'none';
 
     var bhuvanURL = 'https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms';
-    // Added pane: 'cadastralPane' to force WMS layers on top
-    var vLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:village', format: 'image/png', transparent: true, className: 'village-style', maxZoom: 22, tileSize: 512, zoomOffset: -1, pane: 'cadastralPane' });
+    var vLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:village', format: 'image/png', transparent: true, className: 'wms-style-force', maxZoom: 22, tileSize: 512, zoomOffset: -1, pane: 'cadastralPane' });
     var cLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:cadastral', format: 'image/png', transparent: true, maxZoom: 22, tileSize: 512, zoomOffset: -1, pane: 'cadastralPane' });
 
-    // Add default village layer to map
     map.addLayer(vLayer);
 
     var baseLayerGroup = { 'hybrid': gHybrid, 'road': gRoad, 'osm': osm };
     var hiddenGeocoder = L.Control.geocoder({ position: 'topright', defaultMarkGeocode: true }).addTo(map);
 
+    // MAGNIFIER MIRROR SETUP
     var miniMap = L.map('zoomBox', { attributionControl: false, zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false });
     L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] }).addTo(miniMap);
+    
+    // Create high priority pane inside mini map too
+    miniMap.createPane('cadastralPaneMini');
+    miniMap.getPane('cadastralPaneMini').style.zIndex = 600;
+    miniMap.getPane('cadastralPaneMini').style.pointerEvents = 'none';
+
+    var vLayerMini = L.tileLayer.wms(bhuvanURL, { layers: 'v3:village', format: 'image/png', transparent: true, className: 'wms-style-force', maxZoom: 22, tileSize: 512, zoomOffset: -1, pane: 'cadastralPaneMini' });
+    var cLayerMini = L.tileLayer.wms(bhuvanURL, { layers: 'v3:cadastral', format: 'image/png', transparent: true, maxZoom: 22, tileSize: 512, zoomOffset: -1, pane: 'cadastralPaneMini' });
+    
+    var drawnItemsMini = L.featureGroup().addTo(miniMap);
+    var fmbMiniGroup = L.featureGroup().addTo(miniMap);
+
+    if (map.hasLayer(vLayer)) miniMap.addLayer(vLayerMini);
 
     function switchBaseLayer(layerKey) {
         for (var key in baseLayerGroup) { map.removeLayer(baseLayerGroup[key]); }
@@ -261,12 +277,16 @@
 
     function toggleWmsOverlay(layerType) {
         var layer = (layerType === 'village') ? vLayer : cLayer;
+        var miniLayer = (layerType === 'village') ? vLayerMini : cLayerMini;
         var btn = document.getElementById(layerType === 'village' ? 'layerToggleVillage' : 'layerToggleCadastral');
+        
         if (map.hasLayer(layer)) {
             map.removeLayer(layer);
+            miniMap.removeLayer(miniLayer);
             btn.style.background = 'rgba(255,255,255,0.2)'; btn.style.color = '#fff';
         } else {
             map.addLayer(layer);
+            miniMap.addLayer(miniLayer);
             btn.style.background = '#ffc107'; btn.style.color = '#000';
         }
     }
@@ -283,48 +303,72 @@
         }
     }
 
-    // 2. UPDATED DRAWING SYSTEM (GEOMAN WITH SNAPPING)
+    // 2. DRAWING SYSTEM (GEOMAN FREE WITH SNAPPING & REARRANGE EDIT INTERFACE)
     var drawnItems = new L.FeatureGroup().addTo(map);
+    var vectorMap = {};
+
     map.pm.addControls({ drawMarker: false, drawPolygon: false, drawPolyline: false, editMode: false, dragMode: false, cutPolygon: false, removalMode: false });
-    
-    map.pm.setGlobalOptions({
-        snappable: true,
-        snapDistance: 25, 
-        snapMiddle: true,
-        layerGroup: map 
-    });
+    map.pm.setGlobalOptions({ snappable: true, snapDistance: 25, snapMiddle: true, layerGroup: map });
     
     function triggerLeafletDraw(toolType) {
-        if(map.pm.GlobalDrawMode === toolType) {
-            map.pm.disableDraw();
-        } else {
-            map.pm.enableDraw(toolType);
-        }
+        if (isEditing) toggleEditMode();
+        if (isEraseMode) toggleEraseMode();
+        if(map.pm.GlobalDrawMode === toolType) { map.pm.disableDraw(); } 
+        else { map.pm.enableDraw(toolType); }
     }
 
     var isEraseMode = false;
     function toggleEraseMode() {
+        if (map.pm.GlobalDrawMode) map.pm.disableDraw();
+        if (isEditing) toggleEditMode();
         map.pm.toggleGlobalRemovalMode();
         isEraseMode = map.pm.globalRemovalModeEnabled();
         var btn = document.getElementById('eraseModeToggleBtn');
         if(isEraseMode) {
             btn.style.background = '#ffc107'; btn.style.color = '#000';
+            document.body.classList.add('show-ui');
             alert("Erase Mode ON: നിങ്ങൾ വരച്ച ലൈനുകളിലോ പോളിഗണുകളിലോ തൊട്ടാൽ അവ മാഞ്ഞുപോകും. ഒഴിവാക്കിയ ശേഷം ഈ ബട്ടൺ വീണ്ടും അമർത്തി OFF ആക്കുക.");
         } else {
             btn.style.background = 'rgba(255,255,255,0.2)'; btn.style.color = '#fff';
+            showUI();
+        }
+    }
+
+    var isEditing = false;
+    function toggleEditMode() {
+        if (map.pm.GlobalDrawMode) map.pm.disableDraw();
+        if (isEraseMode) toggleEraseMode();
+        map.pm.toggleGlobalEditMode();
+        isEditing = map.pm.globalEditModeEnabled();
+        var btn = document.getElementById('customEditBtn');
+        if (isEditing) {
+            btn.classList.add('active-main');
+            document.body.classList.add('show-ui');
+            alert("Edit Mode ON: നിങ്ങൾ വരച്ച ലൈനുകളിലോ പോളിഗണുകളിലോ തൊട്ടാൽ bend point-ുകൾ കാണാം. അവ drag ചെയ്ത് rearrange ചെയ്യുക. കഴിഞ്ഞ ശേഷം ഈ ബട്ടൺ വീണ്ടും അമർത്തി OFF ആക്കുക.");
+        } else {
+            btn.classList.remove('active-main');
+            showUI();
         }
     }
 
     function clearAllDrawings() {
         if(confirm("നിങ്ങൾ വരച്ചതെല്ലാം മായ്ച്ചു കളയണോ? (Clear all drawings?)")) {
             drawnItems.clearLayers();
-            map.eachLayer(function(layer){
-                if(layer.pm && layer instanceof L.Path){
-                    map.removeLayer(layer);
-                }
-            });
+            drawnItemsMini.clearLayers();
+            vectorMap = {};
+            map.eachLayer(function(layer){ if(layer.pm && layer instanceof L.Path){ map.removeLayer(layer); } });
+            if(isEraseMode) toggleEraseMode();
+            if(isEditing) toggleEditMode();
         }
     }
+
+    drawnItems.on('layerremove', function(e3) { 
+        var originalId = L.stamp(e3.layer);
+        var miniId = vectorMap[originalId];
+        var miniLayer = drawnItemsMini.getLayer(miniId);
+        if (miniLayer) drawnItemsMini.removeLayer(miniLayer);
+        delete vectorMap[originalId];
+    });
 
     var isDrawing = false;
     map.on('pm:drawstart', () => { isDrawing = true; document.getElementById('zoomBox').style.display = 'block'; document.body.classList.add('show-ui'); });
@@ -343,18 +387,33 @@
                 var area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
                 layer.bindPopup(`<b>Area:</b><br>${(area * 0.000247).toFixed(3)} Acres<br>${(area * 0.0247).toFixed(2)} Cents`).openPopup();
             }
+
+            var originalId = L.stamp(layer);
+            var style = { color: layer.options.color || '#3388ff', weight: layer.options.weight || 3, opacity: layer.options.opacity || 0.5, fillColor: layer.options.fillColor, fillOpacity: layer.options.fillOpacity };
+            
+            var miniLayer;
+            if (e.shape === 'Line') { miniLayer = L.polyline(layer.getLatLngs(), style).addTo(drawnItemsMini); } 
+            else if (e.shape === 'Polygon' || e.shape === 'Rectangle') { miniLayer = L.polygon(layer.getLatLngs(), style).addTo(drawnItemsMini); }
+            
+            if (miniLayer) {
+                vectorMap[originalId] = L.stamp(miniLayer);
+                layer.on('pm:edit', function(e2) {
+                    var mId = vectorMap[L.stamp(layer)];
+                    var mLayer = drawnItemsMini.getLayer(mId);
+                    if (mLayer) mLayer.setLatLngs(layer.getLatLngs());
+                });
+            }
         }
     });
 
-    // 3. FMB PDF & SVG OVERLAY LOGIC
+    // 3. FMB PDF & SVG OVERLAY GEOMAN ALIGNMENT SYSTEM
     var fmbSvgOverlay = null;
+    var fmbSvgOverlayMini = null;
     var fmbImgDataUrl = "";
     var fmbLat, fmbLng, fmbWidth = 0.003, fmbHeight = 0.003, fmbAngle = 0;
 
     document.getElementById('uploadFMB').onchange = function(e) {
-        var file = e.target.files[0];
-        if (!file) return;
-
+        var file = e.target.files[0]; if (!file) return;
         if (file.type === 'application/pdf') {
             var fileReader = new FileReader();
             fileReader.onload = function() {
@@ -364,12 +423,10 @@
                         var viewport = page.getViewport({scale: 2.0}); 
                         var canvas = document.createElement('canvas');
                         var context = canvas.getContext('2d');
-                        canvas.height = viewport.height;
-                        canvas.width = viewport.width;
+                        canvas.height = viewport.height; canvas.width = viewport.width;
                         var renderContext = { canvasContext: context, viewport: viewport };
                         page.render(renderContext).promise.then(function() {
-                            fmbImgDataUrl = canvas.toDataURL('image/png');
-                            initFMBLayer();
+                            fmbImgDataUrl = canvas.toDataURL('image/png'); initFMBLayer();
                         });
                     });
                 }).catch(function(err) { alert("PDF Load Error: " + err.message); });
@@ -377,21 +434,15 @@
             fileReader.readAsArrayBuffer(file);
         } else if (file.type.match('image.*')) {
             var reader = new FileReader();
-            reader.onload = function(event) {
-                fmbImgDataUrl = event.target.result;
-                initFMBLayer();
-            };
+            reader.onload = function(event) { fmbImgDataUrl = event.target.result; initFMBLayer(); };
             reader.readAsDataURL(file);
-        } else {
-            alert("ദയവായി JPG, PNG അല്ലെങ്കിൽ PDF ഫയൽ മാത്രം നൽകുക.");
-        }
+        } else { alert("ദയവായി JPG, PNG അല്ലെങ്കിൽ PDF ഫയൽ മാത്രം നൽകുക."); }
         e.target.value = ""; 
     };
 
     function initFMBLayer() {
         var center = map.getCenter();
-        fmbLat = center.lat; fmbLng = center.lng;
-        fmbAngle = 0; fmbWidth = 0.0025; fmbHeight = 0.0025;
+        fmbLat = center.lat; fmbLng = center.lng; fmbAngle = 0; fmbWidth = 0.0025; fmbHeight = 0.0025;
         renderSVGOverlay();
         document.getElementById('fmbTools').style.display = 'flex';
         showUI();
@@ -404,36 +455,34 @@
         var bounds = L.latLngBounds(sW, nE);
         
         if (fmbSvgOverlay) map.removeLayer(fmbSvgOverlay);
+        if (fmbSvgOverlayMini) miniMap.removeLayer(fmbSvgOverlayMini);
         
         var svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         svgElement.setAttribute('xmlns', "http://www.w3.org/2000/svg");
         svgElement.setAttribute('viewBox', "0 0 100 100");
         
         var svgImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
-        svgImage.setAttribute('width', '100'); 
-        svgImage.setAttribute('height', '100');
+        svgImage.setAttribute('width', '100'); svgImage.setAttribute('height', '100');
         svgImage.setAttributeNS("http://www.w3.org/1999/xlink", "href", fmbImgDataUrl); 
         svgImage.setAttribute("href", fmbImgDataUrl);
         svgImage.setAttribute('transform', `rotate(${fmbAngle} 50 50)`);
-        
         svgElement.appendChild(svgImage);
-        // Standard overlays deploy on overlayPane (400), which stays perfectly under cadastralPane (450)
-        fmbSvgOverlay = L.svgOverlay(svgElement, bounds, { opacity: parseFloat(document.getElementById('fmbOpacity').value), interactive: false }).addTo(map);
+        
+        // standard overlay overlayPane sits perfectly under our custom high-priority cadastralPane
+        fmbSvgOverlay = L.svgOverlay(svgElement, bounds, { pane: 'overlayPane', opacity: parseFloat(document.getElementById('fmbOpacity').value), interactive: false }).addTo(map);
+        
+        var svgClone = svgElement.cloneNode(true);
+        fmbSvgOverlayMini = L.svgOverlay(svgClone, bounds, { interactive: false, opacity: parseFloat(document.getElementById('fmbOpacity').value) }).addTo(miniMap);
     }
 
     function expandTool(toolName) {
         var targetGroup = document.getElementById('group-' + toolName);
         var mainButtons = ['Move', 'Scale', 'Rotate', 'Opacity', 'Layers', 'Erase'];
-        
         mainButtons.forEach(btn => {
             var g = document.getElementById('group-' + btn.toLowerCase());
             var b = document.getElementById('main' + btn + 'Btn') || document.getElementById('custom' + btn + 'Btn');
-            if (btn.toLowerCase() !== toolName) {
-                if(g) g.style.display = 'none';
-                if(b) b.classList.remove('active-main');
-            }
+            if (btn.toLowerCase() !== toolName) { if(g) g.style.display = 'none'; if(b) b.classList.remove('active-main'); }
         });
-
         if (targetGroup.style.display === 'flex') {
             targetGroup.style.display = 'none';
             var currentBtn = document.getElementById('main' + toolName.charAt(0).toUpperCase() + toolName.slice(1) + 'Btn') || document.getElementById('custom' + toolName.charAt(0).toUpperCase() + toolName.slice(1) + 'Btn');
@@ -450,20 +499,16 @@
         var zoomFactor = (22 - map.getZoom());
         var step = 0.000015 * (zoomFactor <= 0 ? 1 : zoomFactor);
         switch(action) {
-            case 'up':    fmbLat += step; break;
-            case 'down':  fmbLat -= step; break;
-            case 'left':  fmbLng -= step; break;
-            case 'right': fmbLng += step; break;
-            case 'zoomin':  fmbWidth *= 1.03; fmbHeight *= 1.03; break;
-            case 'zoomout': fmbWidth *= 0.97; fmbHeight *= 0.97; break;
-            case 'rotL':  fmbAngle -= 1.5; break;
-            case 'rotR':  fmbAngle += 1.5; break;
+            case 'up': fmbLat += step; break; case 'down': fmbLat -= step; break; case 'left': fmbLng -= step; break; case 'right': fmbLng += step; break;
+            case 'zoomin': fmbWidth *= 1.03; fmbHeight *= 1.03; break; case 'zoomout': fmbWidth *= 0.97; fmbHeight *= 0.97; break;
+            case 'rotL': fmbAngle -= 1.5; break; case 'rotR': fmbAngle += 1.5; break;
         }
         renderSVGOverlay();
     };
 
     window.removeFMB = function() {
         if (fmbSvgOverlay) { map.removeLayer(fmbSvgOverlay); fmbSvgOverlay = null; }
+        if (fmbSvgOverlayMini) { miniMap.removeLayer(fmbSvgOverlayMini); fmbSvgOverlayMini = null; }
         fmbImgDataUrl = ""; document.getElementById('uploadFMB').value = "";
         document.getElementById('fmbTools').style.display = 'none';
         if(fmbTouchEditMode) toggleFMBTouch();
@@ -471,19 +516,22 @@
 
     document.getElementById('fmbOpacity').addEventListener('input', function(e) {
         if (fmbSvgOverlay) fmbSvgOverlay.setOpacity(e.target.value);
+        if (fmbSvgOverlayMini) fmbSvgOverlayMini.setOpacity(e.target.value);
     });
 
-    // FMB TOUCH LOGIC
+    // FMB MULTI-TOUCH EDIT CONTROLLER
     var fmbTouchEditMode = false;
     window.toggleFMBTouch = function() {
+        if (map.pm.GlobalDrawMode) map.pm.disableDraw();
+        if (isEditing) toggleEditMode();
         fmbTouchEditMode = !fmbTouchEditMode;
         var btn = document.getElementById('touchToggleBtn');
         if(fmbTouchEditMode) {
             map.dragging.disable(); map.touchZoom.disable(); map.scrollWheelZoom.disable();
-            btn.classList.add('active-main');
+            btn.classList.add('active-main'); document.body.classList.add('show-ui');
         } else {
             map.dragging.enable(); map.touchZoom.enable(); map.scrollWheelZoom.enable();
-            btn.classList.remove('active-main');
+            btn.classList.remove('active-main'); showUI();
         }
     };
 
@@ -494,11 +542,9 @@
         if (!fmbTouchEditMode || !fmbSvgOverlay) return;
         e.preventDefault();
         if (e.touches.length === 1) {
-            touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-            startFmbLat = fmbLat; startFmbLng = fmbLng;
+            touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY }; startFmbLat = fmbLat; startFmbLng = fmbLng;
         } else if (e.touches.length === 2) {
-            var dx = e.touches[0].clientX - e.touches[1].clientX;
-            var dy = e.touches[0].clientY - e.touches[1].clientY;
+            var dx = e.touches[0].clientX - e.touches[1].clientX; var dy = e.touches[0].clientY - e.touches[1].clientY;
             startDist = Math.sqrt(dx*dx + dy*dy);
             startCenter = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
             startFmbLat = fmbLat; startFmbLng = fmbLng; startFmbW = fmbWidth; startFmbH = fmbHeight;
@@ -506,39 +552,27 @@
     }, {passive: false});
 
     map.getContainer().addEventListener('touchmove', function(e) {
-        if (!fmbTouchEditMode || !fmbSvgOverlay) return;
-        e.preventDefault();
+        if (!fmbTouchEditMode || !fmbSvgOverlay) return; e.preventDefault();
         if (e.touches.length === 1 && touchStartPos) {
-            var dx = e.touches[0].clientX - touchStartPos.x;
-            var dy = e.touches[0].clientY - touchStartPos.y;
-            var p1 = map.latLngToContainerPoint([startFmbLat, startFmbLng]);
-            p1.x += dx; p1.y += dy;
-            var newLatLng = map.containerPointToLatLng(p1);
-            fmbLat = newLatLng.lat; fmbLng = newLatLng.lng;
+            var dx = e.touches[0].clientX - touchStartPos.x; var dy = e.touches[0].clientY - touchStartPos.y;
+            var p1 = map.latLngToContainerPoint([startFmbLat, startFmbLng]); p1.x += dx; p1.y += dy;
+            var newLatLng = map.containerPointToLatLng(p1); fmbLat = newLatLng.lat; fmbLng = newLatLng.lng;
             renderSVGOverlay();
         } else if (e.touches.length === 2 && startDist > 0) {
-            var dx = e.touches[0].clientX - e.touches[1].clientX;
-            var dy = e.touches[0].clientY - e.touches[1].clientY;
-            var currentDist = Math.sqrt(dx*dx + dy*dy);
-            var scale = currentDist / startDist;
+            var dx = e.touches[0].clientX - e.touches[1].clientX; var dy = e.touches[0].clientY - e.touches[1].clientY;
+            var currentDist = Math.sqrt(dx*dx + dy*dy); var scale = currentDist / startDist;
             fmbWidth = startFmbW * scale; fmbHeight = startFmbH * scale;
             var currentCenter = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
-            var cdx = currentCenter.x - startCenter.x;
-            var cdy = currentCenter.y - startCenter.y;
-            var p1 = map.latLngToContainerPoint([startFmbLat, startFmbLng]);
-            p1.x += cdx; p1.y += cdy;
-            var newLatLng = map.containerPointToLatLng(p1);
-            fmbLat = newLatLng.lat; fmbLng = newLatLng.lng;
+            var cdx = currentCenter.x - startCenter.x; var cdy = currentCenter.y - startCenter.y;
+            var p1 = map.latLngToContainerPoint([startFmbLat, startFmbLng]); p1.x += cdx; p1.y += cdy;
+            var newLatLng = map.containerPointToLatLng(p1); fmbLat = newLatLng.lat; fmbLng = newLatLng.lng;
             renderSVGOverlay();
         }
     }, {passive: false});
 
-    map.getContainer().addEventListener('touchend', function(e) {
-        if (!fmbTouchEditMode) return;
-        touchStartPos = null; startDist = 0;
-    }, {passive: false});
+    map.getContainer().addEventListener('touchend', function(e) { if (!fmbTouchEditMode) return; touchStartPos = null; startDist = 0; }, {passive: false});
 
-    // 4. CROSSHAIR GPS CONTROLLERS
+    // 4. CROSSHAIR GPS TRACKER
     var liveUserMarker = null, accuracyCircle = null, isGPS = false;
     var firstGpsFix = true; 
     var crossIcon = L.divIcon({ className: 'blue-dot-container', html: '<div class="cross-v"></div><div class="cross-h"></div><div class="blue-dot"></div>', iconSize: [60, 60], iconAnchor: [30, 30] });
@@ -552,9 +586,7 @@
     function stopLocationTracking() { map.stopLocate(); if(liveUserMarker) map.removeLayer(liveUserMarker); if(accuracyCircle) map.removeLayer(accuracyCircle); liveUserMarker = null; accuracyCircle = null; isGPS = false; }
 
     map.on('locationfound', (e) => {
-        if(firstGpsFix) { map.setView(e.latlng, 19); firstGpsFix = false; }
-        else { map.panTo(e.latlng); }
-        
+        if(firstGpsFix) { map.setView(e.latlng, 19); firstGpsFix = false; } else { map.panTo(e.latlng); }
         if(!liveUserMarker) {
             liveUserMarker = L.marker(e.latlng, {icon: crossIcon}).addTo(map);
             accuracyCircle = L.circle(e.latlng, {radius: e.accuracy, color: '#007bff', weight: 1, opacity: 0.3, fillOpacity: 0.05}).addTo(map);
@@ -572,19 +604,19 @@
         });
     });
 
-    // 5. DATA LOCAL STORAGE NOTES
+    // 5. LOCAL STORAGE STORAGE NOTES
     var pinGroup = L.layerGroup().addTo(map);
     var savedNotes = JSON.parse(localStorage.getItem('murali_final_v10') || '[]');
     function renderNotes() {
         pinGroup.clearLayers();
         savedNotes.forEach((p, i) => {
-            L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(`<b>Note:</b><br>${p.text}<br><button class="nav-btn" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}')">Navigate</button><button class="del-btn" onclick="deleteNote(${i})">Delete</button>`);
+            L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(`<b>Note:</b><br>${p.text}<br><button class="nav-btn" onclick="window.open('http://maps.google.com/?q=${p.lat},${p.lng}')">Navigate</button><button class="del-btn" onclick="deleteNote(${i})">Delete</button>`);
         });
     }
     window.deleteNote = (i) => { savedNotes.splice(i, 1); localStorage.setItem('murali_final_v10', JSON.stringify(savedNotes)); renderNotes(); };
     renderNotes();
 
-    // 6. KML DATA IMPORT-EXPORT
+    // 6. KML/GEOJSON DATA LOADING
     document.getElementById('uploadFile').onchange = function(e) {
         var file = e.target.files[0]; if (!file) return;
         var reader = new FileReader();
@@ -597,23 +629,14 @@
         reader.readAsText(file);
     };
 
-    // 7. SMART INTERFACE TIMER MANAGEMENT (Auto-Hide)
+    // 7. AUTO-HIDE SYSTEM
     var uiTimer; 
     function showUI() { 
-        document.body.classList.add('show-ui'); 
-        clearTimeout(uiTimer); 
-        uiTimer = setTimeout(() => { 
-            if(!isDrawing && !fmbTouchEditMode && !isEraseMode) document.body.classList.remove('show-ui'); 
-        }, 6000); 
+        document.body.classList.add('show-ui'); clearTimeout(uiTimer); 
+        uiTimer = setTimeout(() => { if(!isDrawing && !fmbTouchEditMode && !isEraseMode && !isEditing) document.body.classList.remove('show-ui'); }, 6000); 
     }
-    
-    map.on('dragstart zoomstart mousedown touchstart', function() {
-        if(!isDrawing && !fmbTouchEditMode && !isEraseMode) { document.body.classList.remove('show-ui'); }
-    });
-
-    document.addEventListener('mousemove', showUI);
-    document.addEventListener('keydown', showUI);
-    document.addEventListener('touchstart', showUI);
+    map.on('dragstart zoomstart mousedown touchstart', function() { if(!isDrawing && !fmbTouchEditMode && !isEraseMode && !isEditing) { document.body.classList.remove('show-ui'); } });
+    document.addEventListener('mousemove', showUI); document.addEventListener('keydown', showUI); document.addEventListener('touchstart', showUI);
 
     function downloadKML() {
         var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>';
