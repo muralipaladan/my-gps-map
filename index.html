@@ -303,7 +303,7 @@
       font-family:var(--font); font-size:12px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
       cursor:pointer; transition:filter var(--t1), transform var(--t1) var(--spring);
     }
-    .modal-btn:hover  { filter:brightness(1.15); }
+    .modal-btn:hover  { filter:brightness(1.15); box-shadow:0 4px 18px rgba(0,0,0,.4); }
     .modal-btn:active { transform:scale(.93); }
     .modal-btn.cancel { background:var(--surface-3); color:var(--text-mid); }
     .modal-btn.confirm { background:var(--red); color:#fff; }
@@ -789,19 +789,17 @@
 
     map.on('pm:globaldrawmodetoggled', e => { if (!e.enabled) clearHighlights(); });
 
-    // Show Magnifier when drawing
+    // Track when drawing happens
     map.on('pm:drawstart', () => {
       State.drawing = true;
-      document.getElementById('zoomBox').style.display = 'block';
       document.body.classList.add('show-ui');
     });
     map.on('pm:drawend', () => {
       State.drawing = false;
-      document.getElementById('zoomBox').style.display = 'none';
       showUI();
     });
 
-    // Show Magnifier when dragging points in Edit Mode
+    // MAGNIFIER ACTIVATION: Only when dragging node handles during edit time
     map.on('pm:markerdragstart', () => {
       State.draggingVertex = true;
       document.getElementById('zoomBox').style.display = 'block';
@@ -812,9 +810,9 @@
       document.getElementById('zoomBox').style.display = 'none';
     });
 
-    // Update Magnifier position when drawing or dragging
+    // Update Magnifier view dynamically only when dragging vertex points
     map.on('mousemove', e => { 
-      if (State.drawing || State.draggingVertex) {
+      if (State.draggingVertex) {
         mini.setView(e.latlng, map.getZoom() + 3); 
       }
     });
