@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Murali Master GIS — Pro Georeference & Tracing</title>
+  <title>Sodestus — Pro Georeference & Tracing</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
@@ -76,7 +76,7 @@
        LEFT RIBBON TOOLBAR
     ═══════════════════════════════════════════════════ */
     .ribbon {
-      position:absolute; top:14px; left:12px; z-index:2000;
+      position:absolute; top:175px; left:14px; z-index:2000;
       width:var(--ribbon-w);
       display:flex; flex-direction:column; align-items:center; gap:5px;
       background:var(--surface);
@@ -167,18 +167,22 @@
        SEARCH BAR
     ═══════════════════════════════════════════════════ */
     .searchbar {
-      position:absolute; top:14px; left:calc(var(--ribbon-w) + 24px); z-index:2000;
+      position:absolute; top:76px; right:14px; z-index:2000;
       display:flex; align-items:center; gap:4px;
       background:var(--surface); border:1px solid var(--border);
       border-radius:var(--r-md); padding:5px 5px;
       box-shadow:var(--sh-md);
+      width: calc(100% - 28px);
+      max-width: 320px;
       transition:border-color var(--t1), box-shadow var(--t1);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
     }
     .searchbar:focus-within { border-color:var(--border-hi); box-shadow:var(--sh-md), 0 0 0 2px rgba(229,92,0,.2); }
     .searchbar input {
       background:none; border:none; outline:none;
       color:var(--text); font-family:var(--font); font-size:13px; font-weight:600; letter-spacing:.2px;
-      width:205px; padding:5px 8px;
+      width:100%; padding:5px 8px;
     }
     .searchbar input::placeholder { color:var(--text-dim); font-weight:400; }
     .searchbar button {
@@ -191,16 +195,20 @@
     .searchbar button:active { transform:scale(.88); }
 
     /* ═══════════════════════════════════════════════════
-       HUD STATUS BADGE (top-right)
+       HUD STATUS BADGE (top Bar - one-line)
     ═══════════════════════════════════════════════════ */
     .hud-badge {
-      position:absolute; top:14px; right:14px; z-index:2000;
+      position:absolute; top:36px; right:14px; z-index:2000;
+      width: calc(100% - 28px);
+      max-width: 320px;
       background:var(--surface); border:1px solid var(--border);
-      border-radius:var(--r-md); padding:8px 13px;
+      border-radius:var(--r-md); padding:8px 16px;
       font-family:var(--mono); font-size:9.5px; letter-spacing:.4px; color:var(--text-mid);
-      box-shadow:var(--sh-sm); display:flex; flex-direction:column; gap:4px; min-width:134px;
+      box-shadow:var(--sh-sm); display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:12px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
     }
-    .badge-row { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .badge-col { display:flex; align-items:center; gap:6px; }
     .badge-val { color:var(--text); font-weight:500; }
     .gps-dot {
       display:inline-block; width:7px; height:7px; border-radius:50%;
@@ -214,7 +222,7 @@
        MAGNIFIER (Small, Beautiful, Circular) - FIXED FOR CANVAS RENDER
     ═══════════════════════════════════════════════════ */
     #zoomBox {
-      position:absolute; top:68px; left:calc(var(--ribbon-w) + 24px);
+      position:absolute; top:175px; left:calc(var(--ribbon-w) + 24px);
       width:100px; height:100px; z-index:3000;
       border:3px solid var(--accent); border-radius:50%;
       background:#000; pointer-events:none; overflow:hidden;
@@ -383,7 +391,7 @@
 
 <!-- BOOT SPLASH -->
 <div id="splash">
-  <p class="splash-logo">Murali <span>GIS</span></p>
+  <p class="splash-logo">Sodestus <span>GIS</span></p>
   <div class="spin-ring"></div>
   <p class="splash-sub">Loading map engine…</p>
 </div>
@@ -393,36 +401,37 @@
 <div id="zoomBox"></div>
 
 <!-- SEARCH BAR -->
-<div class="searchbar hud" id="searchBar">
+<div class="searchbar" id="searchBar">
   <input type="text" id="searchInput" placeholder="Search place or lat, lng…" autocomplete="off" />
   <button id="searchBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
 </div>
 
-<!-- HUD STATUS BADGE -->
-<div class="hud-badge hud" id="hudBadge">
-  <div class="badge-row">
-    <span><span class="gps-dot" id="gpsDot"></span>GPS</span>
+<!-- HUD STATUS BADGE (Horizontal line layout) -->
+<div class="hud-badge" id="hudBadge">
+  <div class="badge-col">
+    <span><span class="gps-dot" id="gpsDot"></span>GPS:</span>
     <span class="badge-val" id="badgeGps">—</span>
   </div>
-  <div class="badge-row">
-    <span>ZOOM</span>
+  <div class="badge-col">
+    <span>ZOOM:</span>
     <span class="badge-val" id="badgeZoom">16</span>
   </div>
-  <div class="badge-row">
-    <span>LAYER</span>
+  <div class="badge-col">
+    <span>LAYER:</span>
     <span class="badge-val" id="badgeLayer">HYB</span>
   </div>
 </div>
 
 <!-- LEFT RIBBON -->
-<div class="ribbon hud" id="ribbon">
+<div class="ribbon" id="ribbon">
   <button class="rb" id="gpsBtn" data-tip="Live GPS" onclick="GIS.GPS.toggle()"><i class="fa-solid fa-crosshairs"></i></button>
+  <button class="rb" id="routeModeBtn" data-tip="Route Planner" onclick="GIS.Draw.toggleRouteMode()"><i class="fa-solid fa-route"></i></button>
   <div class="rdiv"></div>
 
   <button class="rb" id="lineBtn"    data-tip="Draw Line"    onclick="GIS.Draw.trigger('Line')">   <i class="fa-solid fa-file-signature"></i></button>
   <button class="rb" id="polygonBtn" data-tip="Draw Polygon" onclick="GIS.Draw.trigger('Polygon')"><i class="fa-solid fa-draw-polygon"></i></button>
   <button class="rb" id="markerBtn"  data-tip="Save Note"    onclick="GIS.Draw.trigger('Marker')"> <i class="fa-solid fa-location-dot"></i></button>
-  <button class="rb" id="editBtn"    data-tip="Edit Shapes"  onclick="GIS.Draw.toggleEdit()">      <i class="fa-solid fa-pen-to-square"></i></button>
+  <button class="rb" id="editBtn"    data-tip="Edit Shapes"  onclick="GIS.Draw.toggleEdit()"><i class="fa-solid fa-pen-to-square"></i></button>
 
   <button class="rb" id="eraseBtn" data-tip="Erase Tools" onclick="GIS.UI.expand('erase')"><i class="fa-solid fa-eraser"></i></button>
   <div class="sub-group" id="group-erase">
@@ -585,7 +594,7 @@
   };
 
   /* ── SHARED STATE (single source of truth) ─────────── */
-  const State = { drawing: false, eraseMode: false, editMode: false, touchMove: false, draggingVertex: false };
+  const State = { drawing: false, eraseMode: false, editMode: false, touchMove: false, draggingVertex: false, routeMode: false, userLatLng: null };
 
   /* ── MAP INIT ───────────────────────────────────────── */
   const tileSrc = {
@@ -616,11 +625,17 @@
   map.addLayer(wmsLayers.village);
 
   /* ── MINI-MAP (magnifier) ───────────────────────────── */
+  const baseLayersMini = {
+    hybrid: L.tileLayer(tileSrc.hybrid, googleSubs),
+    road:   L.tileLayer(tileSrc.road,   googleSubs),
+    osm:    L.tileLayer(tileSrc.osm,    { maxZoom:22 }),
+  };
+
   const mini = L.map('zoomBox', {
     attributionControl:false, zoomControl:false,
     dragging:false, touchZoom:false, scrollWheelZoom:false, doubleClickZoom:false, boxZoom:false,
+    layers:[baseLayersMini.hybrid]
   });
-  L.tileLayer(tileSrc.hybrid, googleSubs).addTo(mini);
   mini.createPane('miniCadastral');
   Object.assign(mini.getPane('miniCadastral').style, { zIndex:'600', pointerEvents:'none' });
 
@@ -633,9 +648,83 @@
   const drawnItems     = new L.FeatureGroup().addTo(map);
   const drawnItemsMini = new L.FeatureGroup().addTo(mini);
   const vectorSync     = {};   // mainLayerId → miniLayerId
+  let routeLayer       = null;
+  let routeLayerMini   = null;
+
+  /* ── TOUCH & MOUSE TRACKING FOR MAGNIFIER (ZOOM GLASS) ── */
+  const showMagnifier = () => {
+    document.getElementById('zoomBox').classList.add('active');
+  };
+  const hideMagnifier = () => {
+    if (!State.draggingVertex && !State.drawing) {
+      document.getElementById('zoomBox').classList.remove('active');
+    }
+  };
+
+  const mapContainer = map.getContainer();
+  const updateMagnifierPosition = (domEvent) => {
+    if (State.draggingVertex || State.drawing) {
+      const touch = domEvent.touches ? domEvent.touches[0] : domEvent;
+      if (!touch) return;
+      const rect = mapContainer.getBoundingClientRect();
+      const containerPoint = L.point(
+        touch.clientX - rect.left,
+        touch.clientY - rect.top
+      );
+      const latlng = map.containerPointToLatLng(containerPoint);
+      mini.setView(latlng, map.getZoom() + 4);
+    }
+  };
+
+  mapContainer.addEventListener('touchstart', (e) => {
+    if (State.draggingVertex || State.drawing) {
+      showMagnifier();
+      updateMagnifierPosition(e);
+    }
+  }, { passive: true });
+
+  mapContainer.addEventListener('touchmove', (e) => {
+    if (State.draggingVertex || State.drawing) {
+      showMagnifier();
+      updateMagnifierPosition(e);
+    }
+  }, { passive: true });
+
+  mapContainer.addEventListener('touchend', () => {
+    hideMagnifier();
+  }, { passive: true });
+
+  mapContainer.addEventListener('touchcancel', () => {
+    hideMagnifier();
+  }, { passive: true });
+
+  mapContainer.addEventListener('mousedown', (e) => {
+    if (State.draggingVertex || State.drawing) {
+      showMagnifier();
+      updateMagnifierPosition(e);
+    }
+  });
+
+  mapContainer.addEventListener('mousemove', (e) => {
+    if (State.draggingVertex || State.drawing) {
+      updateMagnifierPosition(e);
+    }
+  });
+
+  mapContainer.addEventListener('mouseup', () => {
+    hideMagnifier();
+  });
 
   /* HUD updates */
   map.on('zoomend', () => document.getElementById('badgeZoom').textContent = map.getZoom());
+  map.on('click', e => {
+    if (State.routeMode) {
+      Draw.drawShortestRoute(e.latlng.lat, e.latlng.lng);
+    }
+    if (State.drawing) {
+      mini.setView(e.latlng, map.getZoom() + 4);
+    }
+  });
   map.on('dragstart zoomstart', () => {
     if (!State.drawing && !State.touchMove && !State.eraseMode && !State.editMode)
       document.body.classList.remove('show-ui');
@@ -652,6 +741,11 @@
     setBase(key) {
       Object.values(baseLayers).forEach(l => map.removeLayer(l));
       map.addLayer(baseLayers[key]);
+      
+      // Sync mini base layers too
+      Object.values(baseLayersMini).forEach(l => mini.removeLayer(l));
+      mini.addLayer(baseLayersMini[key]);
+      
       this._current = key;
       document.getElementById('badgeLayer').textContent = key.toUpperCase().slice(0,4);
       Toast.show(`Switched to <b>${key}</b> layer`, 'info', 2500);
@@ -676,17 +770,19 @@
      MODULE: SEARCH
   ════════════════════════════════════════════════════ */
   const Search = (() => {
-    let marker = null;
+    let marker = null, markerMini = null;
     const execute = async () => {
       const raw = document.getElementById('searchInput').value.trim();
       if (!raw) return;
       if (marker) { map.removeLayer(marker); marker = null; }
+      if (markerMini) { mini.removeLayer(markerMini); markerMini = null; }
 
       const parts = raw.split(/[\s,]+/);
       if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
         const [lat, lng] = parts.map(Number);
         map.setView([lat, lng], 17);
         marker = L.marker([lat, lng]).addTo(map).bindPopup(`<b>Coordinates</b><br><code>${lat.toFixed(6)}, ${lng.toFixed(6)}</code>`).openPopup();
+        markerMini = L.marker([lat, lng], { interactive: false }).addTo(mini);
         return;
       }
       try {
@@ -696,6 +792,7 @@
         const { lat, lon, display_name } = data[0];
         map.setView([+lat, +lon], 15);
         marker = L.marker([+lat, +lon]).addTo(map).bindPopup(`<b>${display_name}</b>`).openPopup();
+        markerMini = L.marker([+lat, +lon], { interactive: false }).addTo(mini);
       } catch { Toast.show('Search error — check internet', 'error'); }
     };
     document.getElementById('searchBtn').addEventListener('click', execute);
@@ -708,11 +805,63 @@
   ════════════════════════════════════════════════════ */
   const GPS = (() => {
     let active = false, firstFix = true, userMarker = null, ring = null;
+    let userMarkerMini = null, ringMini = null;
     const crossIcon = L.divIcon({
       className:'blue-dot-container',
       html:'<div class="cross-v"></div><div class="cross-h"></div><div class="blue-dot"></div>',
       iconSize:[60,60], iconAnchor:[30,30],
     });
+
+    const onLocationSuccess = (lat, lng, accuracy) => {
+      const latlng = L.latLng(lat, lng);
+      State.userLatLng = latlng;
+      if (firstFix) { map.setView(latlng, 19); firstFix = false; } else { map.panTo(latlng); }
+      if (!userMarker) {
+        userMarker = L.marker(latlng, { icon:crossIcon }).addTo(map);
+        ring = L.circle(latlng, { radius:accuracy, color:'#60a5fa', weight:1, opacity:.3, fillOpacity:.04 }).addTo(map);
+      } else { 
+        userMarker.setLatLng(latlng); 
+        ring.setLatLng(latlng).setRadius(accuracy); 
+      }
+      
+      // Mirror to magnifier mini map
+      if (!userMarkerMini) {
+        userMarkerMini = L.marker(latlng, { icon:crossIcon }).addTo(mini);
+        ringMini = L.circle(latlng, { radius:accuracy, color:'#60a5fa', weight:1, opacity:.3, fillOpacity:.04 }).addTo(mini);
+      } else {
+        userMarkerMini.setLatLng(latlng);
+        ringMini.setLatLng(latlng).setRadius(accuracy);
+      }
+      
+      document.getElementById('badgeGps').textContent = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+    };
+
+    const onLocationFailure = (msg) => {
+      console.warn("GPS tracking status/failure:", msg);
+      // Fallback to IP geolocation
+      fetchFallbackIP();
+    };
+
+    const fetchFallbackIP = async () => {
+      try {
+        const d = await (await fetch('https://ipapi.co/json/')).json();
+        if (d.latitude && d.longitude) {
+          const ll = L.latLng(d.latitude, d.longitude);
+          State.userLatLng = ll;
+          if (firstFix) { map.setView(ll, 16); firstFix = false; } else { map.panTo(ll); }
+          if (!userMarker) userMarker = L.marker(ll, { icon:crossIcon }).addTo(map);
+          else userMarker.setLatLng(ll);
+          
+          if (!userMarkerMini) userMarkerMini = L.marker(ll, { icon:crossIcon }).addTo(mini);
+          else userMarkerMini.setLatLng(ll);
+          
+          Toast.show('ബ്രൗസർ GPS ലഭ്യമല്ല — IP ലൊക്കേഷൻ ഉപയോഗിക്കുന്നു', 'warn', 6000);
+        }
+      } catch { 
+        Toast.show('Location unavailable', 'error'); 
+      }
+    };
+
     const toggle = () => {
       const btn = document.getElementById('gpsBtn');
       const dot = document.getElementById('gpsDot');
@@ -721,39 +870,54 @@
         btn.classList.add('on-blue');
         dot.classList.add('live');
         document.getElementById('badgeGps').textContent = '…';
-        map.locate({ setView:false, watch:true, enableHighAccuracy:true });
-        Toast.show('GPS tracking <b>started</b>', 'ok');
+        
+        if (window.AndroidDownloadBridge && window.AndroidDownloadBridge.startNativeLocation) {
+          window.AndroidDownloadBridge.startNativeLocation();
+          Toast.show('OS GPS tracking <b>activated</b>', 'ok');
+        } else {
+          map.locate({ setView:false, watch:true, enableHighAccuracy:true });
+          Toast.show('GPS tracking <b>started</b>', 'ok');
+        }
       } else {
-        map.stopLocate();
+        if (window.AndroidDownloadBridge && window.AndroidDownloadBridge.stopNativeLocation) {
+          window.AndroidDownloadBridge.stopNativeLocation();
+        } else {
+          map.stopLocate();
+        }
         if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
         if (ring)       { map.removeLayer(ring); ring = null; }
+        if (userMarkerMini) { mini.removeLayer(userMarkerMini); userMarkerMini = null; }
+        if (ringMini)       { mini.removeLayer(ringMini); ringMini = null; }
         active = false; btn.classList.remove('on-blue'); dot.classList.remove('live');
         document.getElementById('badgeGps').textContent = '—';
         Toast.show('GPS tracking <b>stopped</b>', 'info');
       }
     };
+
     map.on('locationfound', e => {
-      if (firstFix) { map.setView(e.latlng, 19); firstFix = false; } else { map.panTo(e.latlng); }
-      if (!userMarker) {
-        userMarker = L.marker(e.latlng, { icon:crossIcon }).addTo(map);
-        ring = L.circle(e.latlng, { radius:e.accuracy, color:'#60a5fa', weight:1, opacity:.3, fillOpacity:.04 }).addTo(map);
-      } else { userMarker.setLatLng(e.latlng); ring.setLatLng(e.latlng).setRadius(e.accuracy); }
-      document.getElementById('badgeGps').textContent = `${e.latlng.lat.toFixed(4)},${e.latlng.lng.toFixed(4)}`;
+      onLocationSuccess(e.latlng.lat, e.latlng.lng, e.accuracy);
     });
-    map.on('locationerror', async () => {
-      try {
-        const d = await (await fetch('https://ipapi.co/json/')).json();
-        if (d.latitude && d.longitude) {
-          const ll = L.latLng(d.latitude, d.longitude);
-          if (firstFix) { map.setView(ll, 16); firstFix = false; } else { map.panTo(ll); }
-          if (!userMarker) userMarker = L.marker(ll, { icon:crossIcon }).addTo(map);
-          else userMarker.setLatLng(ll);
-          Toast.show('ബ്രൗസർ GPS ലഭ്യമല്ല — IP ലൊക്കേഷൻ ഉപയോഗിക്കുന്നു', 'warn', 6000);
-        }
-      } catch { Toast.show('Location unavailable', 'error'); }
+    map.on('locationerror', () => {
+      if (!window.AndroidDownloadBridge) {
+        onLocationFailure('Leaflet locate error');
+      }
     });
-    return { toggle };
+
+    return { toggle, onLocationSuccess, onLocationFailure };
   })();
+
+  // Global hooks for the native GPS updates to invoke
+  window.onNativeLocationFound = function(lat, lng, accuracy) {
+    if (window.GIS && window.GIS.GPS && window.GIS.GPS.onLocationSuccess) {
+      window.GIS.GPS.onLocationSuccess(lat, lng, accuracy);
+    }
+  };
+
+  window.onNativeLocationError = function(message) {
+    if (window.GIS && window.GIS.GPS && window.GIS.GPS.onLocationFailure) {
+      window.GIS.GPS.onLocationFailure(message);
+    }
+  };
 
   /* ════════════════════════════════════════════════════
      MODULE: DRAW & EDIT
@@ -761,18 +925,21 @@
   const Draw = (() => {
     const savedNotes = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     const pinGroup   = L.layerGroup().addTo(map);
+    const pinGroupMini = L.layerGroup().addTo(mini);
 
     map.pm.addControls({ drawMarker:false, drawPolygon:false, drawPolyline:false, editMode:false, dragMode:false, cutPolygon:false, removalMode:false });
     map.pm.setGlobalOptions({ snappable:true, snapDistance:25, snapMiddle:true, layerGroup:map });
 
     const renderNotes = () => {
       pinGroup.clearLayers();
+      pinGroupMini.clearLayers();
       savedNotes.forEach((p, i) => {
         L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(
           `<b>📍 Note</b><br>${p.text}
-           <button class="p-nav" onclick="window.open('https://maps.google.com/?q=${p.lat},${p.lng}')"><i class='fa-solid fa-location-arrow'></i> Navigate</button>
+           <button class="p-nav" style="background:var(--blue); color:#fff; border:1px solid #1d4ed8; margin-top:6px;" onclick="GIS.Draw.drawShortestRoute(${p.lat}, ${p.lng})"><i class='fa-solid fa-route'></i> Show Route</button>
            <button class="p-del" onclick="GIS.Draw._deleteNote(${i})"><i class='fa-solid fa-trash'></i> Delete</button>`
         );
+        L.marker([p.lat, p.lng]).addTo(pinGroupMini);
       });
     };
     renderNotes();
@@ -795,18 +962,62 @@
 
     map.on('pm:globaldrawmodetoggled', e => { if (!e.enabled) clearHighlights(); });
 
-    map.on('pm:drawstart', () => {
+    let workingLayerMini = null;
+    map.on('pm:drawstart', (e) => {
       State.drawing = true;
       document.body.classList.add('show-ui');
+      document.getElementById('zoomBox').classList.add('active');
+
+      const wl = e.workingLayer;
+      if (wl) {
+        if (workingLayerMini) {
+          mini.removeLayer(workingLayerMini);
+          workingLayerMini = null;
+        }
+
+        const shape = map.pm.Draw.getActiveShape();
+        const style = { color: '#e55c00', weight: 4, dashArray: '5, 5' };
+
+        if (shape === 'Polygon' || shape === 'Rectangle') {
+          workingLayerMini = L.polygon([], style).addTo(mini);
+        } else if (shape === 'Line') {
+          workingLayerMini = L.polyline([], style).addTo(mini);
+        }
+
+        const syncWorkingLayer = () => {
+          if (workingLayerMini && wl.getLatLngs) {
+            try {
+              workingLayerMini.setLatLngs(wl.getLatLngs());
+            } catch (err) {
+              console.warn("Set LatLngs failed on mini sync", err);
+            }
+          }
+        };
+
+        wl.on('pm:vertexadded', syncWorkingLayer);
+        wl.on('pm:vertexremoved', syncWorkingLayer);
+        map.on('mousemove', syncWorkingLayer);
+      }
     });
     map.on('pm:drawend', () => {
       State.drawing = false;
       showUI();
+      document.getElementById('zoomBox').classList.remove('active');
+      if (workingLayerMini) {
+        mini.removeLayer(workingLayerMini);
+        workingLayerMini = null;
+      }
     });
 
-    // Global drag tracking as a fallback for the minimap view
+    // Global drag / draw tracking as a fallback for the minimap view
     map.on('mousemove', e => {
-      if (State.draggingVertex) {
+      if (State.draggingVertex || State.drawing) {
+        mini.setView(e.latlng, map.getZoom() + 4);
+      }
+    });
+
+    map.on('pm:snap', e => {
+      if (State.drawing) {
         mini.setView(e.latlng, map.getZoom() + 4);
       }
     });
@@ -921,6 +1132,8 @@
       } else { showUI(); }
     };
 
+    let routeLayerMini = null;
+
     const clearAll = async () => {
       const ok = await Modal.confirm('Clear all drawings?', 'This will remove all lines, polygons and shapes. This cannot be undone.');
       if (!ok) return;
@@ -929,6 +1142,10 @@
       map.eachLayer(l => { if (l.pm && l instanceof L.Path) map.removeLayer(l); });
       if (State.eraseMode) toggleErase();
       if (State.editMode)  toggleEdit();
+      if (routeLayerMini) {
+        mini.removeLayer(routeLayerMini);
+        routeLayerMini = null;
+      }
       Toast.show('All drawings cleared', 'ok');
     };
 
@@ -939,7 +1156,111 @@
       Toast.show('Note deleted', 'ok', 2500);
     };
 
-    return { trigger, toggleErase, toggleEdit, clearAll, _deleteNote };
+    const toggleRouteMode = () => {
+      if (map.pm.GlobalDrawMode) map.pm.disableDraw();
+      if (State.editMode) toggleEdit();
+      if (State.eraseMode) toggleErase();
+
+      State.routeMode = !State.routeMode;
+      const btn = document.getElementById('routeModeBtn');
+      if (State.routeMode) {
+        btn.classList.add('on-accent');
+        Toast.show('Route Planner <b>ACTIVE</b> — Tap anywhere on the map to find the shortest routing line.', 'info', 5000);
+      } else {
+        btn.classList.remove('on-accent');
+        if (routeLayer) {
+          map.removeLayer(routeLayer);
+          routeLayer = null;
+        }
+        if (routeLayerMini) {
+          mini.removeLayer(routeLayerMini);
+          routeLayerMini = null;
+        }
+      }
+    };
+
+    const drawShortestRoute = async (destLat, destLng) => {
+      if (routeLayer) {
+        map.removeLayer(routeLayer);
+        routeLayer = null;
+      }
+      if (routeLayerMini) {
+        mini.removeLayer(routeLayerMini);
+        routeLayerMini = null;
+      }
+
+      let startLoc = State.userLatLng;
+      if (!startLoc) {
+        if (!document.getElementById('gpsBtn').classList.contains('on-blue')) {
+          GPS.toggle();
+        }
+        startLoc = map.getCenter();
+        Toast.show('Calculating driving line from Map Center…', 'info', 2000);
+      }
+
+      const url = `https://router.project-osrm.org/route/v1/driving/${startLoc.lng},${startLoc.lat};${destLng},${destLat}?overview=full&geometries=geojson`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (!data.routes || data.routes.length === 0) {
+          throw new Error('No driving path possible');
+        }
+
+        const route = data.routes[0];
+        const coordinates = route.geometry.coordinates.map(c => [c[1], c[0]]);
+
+        const outline = L.polyline(coordinates, {
+          color: '#ffffff',
+          weight: 7,
+          opacity: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round'
+        });
+
+        const innerLine = L.polyline(coordinates, {
+          color: '#1d4ed8',
+          weight: 4,
+          opacity: 1,
+          lineCap: 'round',
+          lineJoin: 'round'
+        });
+
+        routeLayer = L.featureGroup([outline, innerLine]);
+        routeLayer.addTo(map);
+
+        // Mirror the route to mini map magnifier
+        const outlineMini = L.polyline(coordinates, {
+          color: '#ffffff',
+          weight: 7,
+          opacity: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round'
+        });
+
+        const innerLineMini = L.polyline(coordinates, {
+          color: '#1d4ed8',
+          weight: 4,
+          opacity: 1,
+          lineCap: 'round',
+          lineJoin: 'round'
+        });
+
+        routeLayerMini = L.featureGroup([outlineMini, innerLineMini]);
+        routeLayerMini.addTo(mini);
+
+        map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+
+        const rawDist = route.distance / 1000;
+        const rawDur  = route.duration / 60;
+        Toast.show(`<b>Driving Route Found</b><br><i class="fa-solid fa-road"></i> Distance: ${rawDist.toFixed(2)} km<br><i class="fa-solid fa-clock"></i> Duration: ${Math.round(rawDur)} mins`, 'ok', 6000);
+      } catch (err) {
+        Toast.show('Shortest Path routing failed — check connection.', 'error');
+        console.error(err);
+      }
+    };
+
+    return { trigger, toggleErase, toggleEdit, clearAll, _deleteNote, toggleRouteMode, drawShortestRoute };
   })();
 
   /* ════════════════════════════════════════════════════
@@ -1107,7 +1428,7 @@
       kml += '</Document></kml>';
       const a = Object.assign(document.createElement('a'), {
         href:     URL.createObjectURL(new Blob([kml], { type:'application/vnd.google-earth.kml+xml' })),
-        download: 'Murali_Traced_Map.kml',
+        download: 'Sodestus_Traced_Map.kml',
       });
       a.click(); URL.revokeObjectURL(a.href);
       Toast.show('KML exported', 'ok');
