@@ -89,7 +89,6 @@
       transform:translateX(0);
     }
     .ribbon::-webkit-scrollbar { display:none; }
-    /* subtle scanline texture */
     .ribbon::after {
       content:''; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
       background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(255,255,255,.008) 3px,rgba(255,255,255,.008) 4px);
@@ -212,14 +211,21 @@
     @keyframes dotPulse { 50%{ box-shadow:0 0 0 6px rgba(96,165,250,.1), 0 0 14px var(--blue-light); } }
 
     /* ═══════════════════════════════════════════════════
-       MAGNIFIER (Small, Beautiful, Circular)
+       MAGNIFIER (Small, Beautiful, Circular) - FIXED FOR CANVAS RENDER
     ═══════════════════════════════════════════════════ */
     #zoomBox {
       position:absolute; top:68px; left:calc(var(--ribbon-w) + 24px);
       width:100px; height:100px; z-index:3000;
       border:3px solid var(--accent); border-radius:50%;
-      background:#000; display:none; pointer-events:none; overflow:hidden;
+      background:#000; pointer-events:none; overflow:hidden;
       box-shadow:var(--sh-md), 0 0 15px var(--accent-glow);
+      
+      /* New visibility approach prevents blank map issues */
+      opacity: 0; visibility: hidden; transform: scale(0.9);
+      transition: opacity var(--t1) var(--ease), transform var(--t1) var(--ease), visibility var(--t1);
+    }
+    #zoomBox.active {
+      opacity: 1; visibility: visible; transform: scale(1);
     }
     /* Simple elegant crosshair */
     #zoomBox::before {
@@ -251,7 +257,7 @@
     .btn-import  { background:var(--surface-3); color:var(--text); border:1px solid var(--border-hi); }
 
     /* ═══════════════════════════════════════════════════
-       TOAST NOTIFICATIONS (replaces alert)
+       TOAST NOTIFICATIONS
     ═══════════════════════════════════════════════════ */
     #toast-root {
       position:fixed; bottom:80px; right:16px; z-index:9999;
@@ -280,7 +286,7 @@
     .toast-msg { font-family:var(--font); font-size:12px; line-height:1.55; color:var(--text); }
 
     /* ═══════════════════════════════════════════════════
-       CONFIRM MODAL (replaces confirm)
+       CONFIRM MODAL
     ═══════════════════════════════════════════════════ */
     .modal-backdrop {
       position:fixed; inset:0; z-index:9998; background:rgba(0,0,0,.7);
@@ -789,7 +795,6 @@
 
     map.on('pm:globaldrawmodetoggled', e => { if (!e.enabled) clearHighlights(); });
 
-    // Track when drawing happens
     map.on('pm:drawstart', () => {
       State.drawing = true;
       document.body.classList.add('show-ui');
@@ -799,21 +804,10 @@
       showUI();
     });
 
-    // MAGNIFIER ACTIVATION: Only when dragging node handles during edit time
-    map.on('pm:markerdragstart', () => {
-      State.draggingVertex = true;
-      document.getElementById('zoomBox').style.display = 'block';
-      document.body.classList.add('show-ui');
-    });
-    map.on('pm:markerdragend', () => {
-      State.draggingVertex = false;
-      document.getElementById('zoomBox').style.display = 'none';
-    });
-
-    // Update Magnifier view dynamically only when dragging vertex points
-    map.on('mousemove', e => { 
+    // Global drag tracking as a fallback for the minimap view
+    map.on('mousemove', e => {
       if (State.draggingVertex) {
-        mini.setView(e.latlng, map.getZoom() + 3); 
+        mini.setView(e.latlng, map.getZoom() + 4);
       }
     });
 
@@ -832,6 +826,32 @@
       }
       drawnItems.addLayer(layer);
       
+      // --- MAGNIFIER EVENTS ON LAYER LEVEL ---
+      layer.on('pm:markerdragstart', (ev) => {
+        State.draggingVertex = true;
+        document.getElementById('zoomBox').classList.add('active');
+        document.body.classList.add('show-ui');
+        if (ev.marker) mini.setView(ev.marker.getLatLng(), map.getZoom() + 4);
+      });
+
+      layer.on('pm:markerdrag', (ev) => {
+        if (State.draggingVertex) {
+          if (ev.marker) mini.setView(ev.marker.getLatLng(), map.getZoom() + 4); 
+          
+          // Live sync polygon shape to minimap while dragging
+          const ml = drawnItemsMini.getLayer(vectorSync[L.stamp(layer)]);
+          if (ml && layer.getLatLngs) {
+            ml.setLatLngs(layer.getLatLngs());
+          }
+        }
+      });
+
+      layer.on('pm:markerdragend', () => {
+        State.draggingVertex = false;
+        document.getElementById('zoomBox').classList.remove('active');
+      });
+      // ---------------------------------------
+
       // Updated Area Popup Logic
       if (shape === 'Polygon' || shape === 'Rectangle') {
         const updateAreaPopup = () => {
