@@ -212,24 +212,21 @@
     @keyframes dotPulse { 50%{ box-shadow:0 0 0 6px rgba(96,165,250,.1), 0 0 14px var(--blue-light); } }
 
     /* ═══════════════════════════════════════════════════
-       MAGNIFIER
+       MAGNIFIER (Small, Beautiful, Circular)
     ═══════════════════════════════════════════════════ */
     #zoomBox {
       position:absolute; top:68px; left:calc(var(--ribbon-w) + 24px);
-      width:138px; height:138px; z-index:3000;
-      border:2px solid var(--blue); border-radius:var(--r-md);
+      width:100px; height:100px; z-index:3000;
+      border:3px solid var(--accent); border-radius:50%;
       background:#000; display:none; pointer-events:none; overflow:hidden;
-      box-shadow:var(--sh-md), 0 0 0 1px rgba(37,99,235,.2);
+      box-shadow:var(--sh-md), 0 0 15px var(--accent-glow);
     }
-    #zoomBox::after {
-      content:'◎ MAGNIFY'; position:absolute; bottom:5px; left:50%; transform:translateX(-50%);
-      font-family:var(--mono); font-size:7.5px; letter-spacing:1.2px; color:rgba(96,165,250,.5);
-    }
-    /* crosshair reticle */
+    /* Simple elegant crosshair */
     #zoomBox::before {
-      content:''; position:absolute; inset:0; pointer-events:none; z-index:1;
-      background: linear-gradient(rgba(37,99,235,.15) 1px,transparent 1px) center/100% 50%,
-                  linear-gradient(90deg,rgba(37,99,235,.15) 1px,transparent 1px) center/50% 100%;
+      content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
+      width:14px; height:14px; pointer-events:none; z-index:1;
+      background: linear-gradient(rgba(255,255,255,0.75) 1.5px, transparent 1.5px) center/100% 1.5px no-repeat,
+                  linear-gradient(90deg, rgba(255,255,255,0.75) 1.5px, transparent 1.5px) center/1.5px 100% no-repeat;
     }
 
     /* ═══════════════════════════════════════════════════
@@ -582,7 +579,7 @@
   };
 
   /* ── SHARED STATE (single source of truth) ─────────── */
-  const State = { drawing: false, eraseMode: false, editMode: false, touchMove: false };
+  const State = { drawing: false, eraseMode: false, editMode: false, touchMove: false, draggingVertex: false };
 
   /* ── MAP INIT ───────────────────────────────────────── */
   const tileSrc = {
@@ -753,7 +750,7 @@
   })();
 
   /* ════════════════════════════════════════════════════
-     MODULE: DRAW
+     MODULE: DRAW & EDIT
   ════════════════════════════════════════════════════ */
   const Draw = (() => {
     const savedNotes = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -792,6 +789,7 @@
 
     map.on('pm:globaldrawmodetoggled', e => { if (!e.enabled) clearHighlights(); });
 
+    // Show Magnifier when drawing
     map.on('pm:drawstart', () => {
       State.drawing = true;
       document.getElementById('zoomBox').style.display = 'block';
@@ -802,7 +800,24 @@
       document.getElementById('zoomBox').style.display = 'none';
       showUI();
     });
-    map.on('mousemove', e => { if (State.drawing) mini.setView(e.latlng, map.getZoom() + 3); });
+
+    // Show Magnifier when dragging points in Edit Mode
+    map.on('pm:markerdragstart', () => {
+      State.draggingVertex = true;
+      document.getElementById('zoomBox').style.display = 'block';
+      document.body.classList.add('show-ui');
+    });
+    map.on('pm:markerdragend', () => {
+      State.draggingVertex = false;
+      document.getElementById('zoomBox').style.display = 'none';
+    });
+
+    // Update Magnifier position when drawing or dragging
+    map.on('mousemove', e => { 
+      if (State.drawing || State.draggingVertex) {
+        mini.setView(e.latlng, map.getZoom() + 3); 
+      }
+    });
 
     map.on('pm:create', e => {
       const { layer, shape } = e;
@@ -1139,4 +1154,3 @@
 </script>
 </body>
 </html>
-
