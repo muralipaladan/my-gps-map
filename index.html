@@ -818,13 +818,30 @@
         map.removeLayer(layer); return;
       }
       drawnItems.addLayer(layer);
+      
+      // Updated Area Popup Logic
       if (shape === 'Polygon' || shape === 'Rectangle') {
-        const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
-        layer.bindPopup(
-          `<b>Area</b>
-           <p class="area-label">${(area * 0.000247).toFixed(3)} ac · ${(area * 0.0247).toFixed(2)} cents</p>`
-        ).openPopup();
+        const updateAreaPopup = () => {
+          if (shape === 'Polygon' || shape === 'Rectangle') {
+            const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+            const popupContent = `<b>Area</b>
+               <p class="area-label">${(area * 0.000247105).toFixed(3)} ac · ${(area * 0.0247105).toFixed(2)} cents</p>`;
+            
+            if (layer.getPopup()) {
+              layer.setPopupContent(popupContent);
+            } else {
+              layer.bindPopup(popupContent).openPopup();
+            }
+          }
+        };
+
+        updateAreaPopup(); // initial trigger
+        layer.on('pm:edit', updateAreaPopup);
+        layer.on('pm:markerdragend', updateAreaPopup);
+        layer.on('pm:vertexadded', updateAreaPopup);
+        layer.on('pm:vertexremoved', updateAreaPopup);
       }
+
       const origId = L.stamp(layer);
       const style  = { color: layer.options.color || '#3388ff', weight: layer.options.weight || 3 };
       let miniL;
@@ -1122,3 +1139,4 @@
 </script>
 </body>
 </html>
+
