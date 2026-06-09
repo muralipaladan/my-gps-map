@@ -1,244 +1,516 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Murali Master GIS - Pro Georeference & Tracing</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
-    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Murali Master GIS — Pro Georeference & Tracing</title>
 
-    <style>
-        #map { height: 100vh; width: 100%; position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
-        body { margin: 0; padding: 0; font-family: sans-serif; overflow: hidden; background: #000; }
-        
-        /* Custom WMS Style for contrast */
-        .wms-style-force { filter: contrast(400%) brightness(50%) saturate(8) hue-rotate(320deg) !important; opacity: 0.9; }
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
-        /* Smooth Ribbon & Search Fading on Map Activity */
-        .ubuntu-unified-ribbon, .control-panel, .search-container {
-            opacity: 0; visibility: hidden; transition: opacity 0.3s ease, transform 0.3s ease;
-        }
-        .show-ui .ubuntu-unified-ribbon, .show-ui .control-panel, .show-ui .search-container {
-            opacity: 1; visibility: visible; pointer-events: auto;
-        }
+  <style>
+    /* ═══════════════════════════════════════════════════
+       DESIGN TOKENS
+    ═══════════════════════════════════════════════════ */
+    :root {
+      --bg:          #07090e;
+      --surface:     rgba(10,13,20,0.96);
+      --surface-2:   rgba(255,255,255,0.06);
+      --surface-3:   rgba(255,255,255,0.10);
+      --border:      rgba(255,255,255,0.09);
+      --border-hi:   rgba(255,255,255,0.18);
+      --accent:      #e55c00;
+      --accent-glow: rgba(229,92,0,0.35);
+      --accent-hi:   #ff7a26;
+      --green:       #16a34a;
+      --green-glow:  rgba(22,163,74,0.30);
+      --red:         #dc2626;
+      --red-glow:    rgba(220,38,38,0.30);
+      --amber:       #d97706;
+      --blue:        #2563eb;
+      --blue-glow:   rgba(37,99,235,0.35);
+      --blue-light:  #60a5fa;
+      --text:        #dde4ef;
+      --text-dim:    #4b5a72;
+      --text-mid:    #8899b0;
+      --ribbon-w:    50px;
+      --r-sm:        6px;
+      --r-md:        11px;
+      --r-lg:        16px;
+      --r-pill:      999px;
+      --sh-sm:       0 2px 10px rgba(0,0,0,0.5);
+      --sh-md:       0 4px 28px rgba(0,0,0,0.7);
+      --sh-lg:       0 8px 48px rgba(0,0,0,0.85);
+      --ease:        cubic-bezier(.4,0,.2,1);
+      --spring:      cubic-bezier(.34,1.56,.64,1);
+      --t1: 120ms; --t2: 220ms; --t3: 380ms;
+      --font:        'Syne', sans-serif;
+      --mono:        'JetBrains Mono', monospace;
+    }
 
-        /* INDEPENDENT FLOATING SEARCH BAR */
-        .search-container {
-            position: absolute; top: 15px; left: 70px; z-index: 2000;
-            display: flex; background: rgba(22, 22, 22, 0.96); padding: 5px;
-            border-radius: 10px; border: 1px solid rgba(255,255,255,0.15);
-            box-shadow: 0 4px 25px rgba(0,0,0,0.6);
-        }
-        .search-container input {
-            background: rgba(255, 255, 255, 0.1); border: none; color: #fff;
-            padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none; width: 220px;
-        }
-        .search-container input::placeholder { color: #bbb; }
-        .search-container button {
-            background: #E66100; color: white; border: none; margin-left: 6px;
-            padding: 0 14px; border-radius: 6px; cursor: pointer; font-size: 14px;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .search-container button:active { background: #cc5200; }
+    /* ═══════════════════════════════════════════════════
+       BASE
+    ═══════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width:100%; height:100%; background:var(--bg); font-family:var(--font); color:var(--text); overflow:hidden; -webkit-font-smoothing:antialiased; }
 
-        /* Bottom Save/Load Panel */
-        .control-panel {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 2000; background: rgba(255, 255, 255, 0.95); padding: 8px 15px; border-radius: 30px;
-            display: flex; flex-direction: row; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            align-items: center;
-        }
+    /* ═══════════════════════════════════════════════════
+       MAP
+    ═══════════════════════════════════════════════════ */
+    #map { position:absolute; inset:0; z-index:1; }
 
-        /* Magnifier Window */
-        #zoomBox {
-            position: absolute; top: 75px; left: 70px; width: 130px; height: 130px;
-            border: 3px solid #007bff; border-radius: 10px; z-index: 3000;
-            background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            display: none; pointer-events: none; overflow: hidden;
-        }
+    /* ═══════════════════════════════════════════════════
+       AUTO-HIDE SYSTEM
+    ═══════════════════════════════════════════════════ */
+    .hud {
+      opacity:0; visibility:hidden; pointer-events:none;
+      transition: opacity var(--t2) var(--ease), visibility var(--t2) var(--ease), transform var(--t2) var(--ease);
+    }
+    .show-ui .hud { opacity:1; visibility:visible; pointer-events:auto; }
 
-        .btn { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: bold; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
-        .nav-btn { background: #28a745; color: white; border: none; padding: 8px; border-radius: 5px; width: 100%; cursor: pointer; margin-top: 5px; font-weight: bold; }
-        .del-btn { background: #dc3545; color: white; border: none; padding: 6px; border-radius: 4px; width: 100%; cursor: pointer; margin-top: 5px; font-size: 11px; }
-        
-        /* UNIFIED NARROW UBUNTU RIBBON */
-        .ubuntu-unified-ribbon {
-            position: absolute; top: 15px; left: 10px;
-            z-index: 2000; background: rgba(22, 22, 22, 0.96); padding: 10px 4px; border-radius: 12px;
-            box-shadow: 0 4px 25px rgba(0,0,0,0.6); display: flex; flex-direction: column; gap: 10px;
-            width: 46px; align-items: center; border: 1px solid rgba(255,255,255,0.15);
-            max-height: 85vh; overflow-y: auto; overflow-x: hidden;
-        }
-        
-        .ribbon-divider { width: 80%; height: 1px; background: rgba(255,255,255,0.2); margin: 2px 0; }
+    /* ═══════════════════════════════════════════════════
+       LEFT RIBBON TOOLBAR
+    ═══════════════════════════════════════════════════ */
+    .ribbon {
+      position:absolute; top:14px; left:12px; z-index:2000;
+      width:var(--ribbon-w);
+      display:flex; flex-direction:column; align-items:center; gap:5px;
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:var(--r-lg);
+      padding:10px 5px;
+      box-shadow:var(--sh-lg);
+      max-height:88vh; overflow-y:auto; overflow-x:hidden;
+      scrollbar-width:none;
+      transform:translateX(0);
+    }
+    .ribbon::-webkit-scrollbar { display:none; }
+    /* subtle scanline texture */
+    .ribbon::after {
+      content:''; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
+      background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(255,255,255,.008) 3px,rgba(255,255,255,.008) 4px);
+    }
+    .rdiv { width:72%; height:1px; background:var(--border); flex-shrink:0; margin:2px 0; }
 
-        .ribbon-btn {
-            background: rgba(255, 255, 255, 0.08); color: #fff; border: none;
-            width: 38px; height: 38px; border-radius: 8px; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 15px; transition: all 0.2s ease; position: relative;
-        }
-        .ribbon-btn:active, .ribbon-btn.active-main { background: #E66100 !important; color: white !important; }
-        
-        .fmb-load-btn { background: #28a745 !important; color: white !important; }
-        .gps-btn-active { background: #007bff !important; color: white !important; }
-        
-        .sub-tool-group {
-            display: none; flex-direction: column; gap: 5px; background: rgba(255,255,255,0.1);
-            padding: 5px; border-radius: 6px; width: 90%; align-items: center; margin: 2px 0;
-        }
-        
-        .mini-ribbon-btn { background: rgba(255,255,255,0.2); color: #fff; border: none; width: 32px; height: 32px; border-radius: 4px; font-size: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; }
-        .mini-ribbon-btn:active { background: #ffc107; color: #000; }
+    /* ── RIBBON BUTTON ── */
+    .rb {
+      position:relative; width:38px; height:38px; flex-shrink:0;
+      background:var(--surface-2); color:var(--text);
+      border:1px solid transparent; border-radius:var(--r-sm);
+      cursor:pointer; font-size:14px;
+      display:flex; align-items:center; justify-content:center;
+      transition: background var(--t1) var(--ease), border-color var(--t1) var(--ease),
+                  transform var(--t1) var(--spring), box-shadow var(--t1) var(--ease), color var(--t1) var(--ease);
+    }
+    .rb:hover  { background:var(--surface-3); border-color:var(--border-hi); transform:scale(1.07); }
+    .rb:active { transform:scale(0.91); }
+    .rb.on-accent { background:var(--accent)!important; color:#fff!important; border-color:var(--accent-hi)!important; box-shadow:0 0 14px var(--accent-glow); }
+    .rb.on-green  { background:var(--green)!important;  color:#fff!important; border-color:#15803d!important; box-shadow:0 0 12px var(--green-glow); }
+    .rb.on-blue   { background:var(--blue)!important;   color:#fff!important; border-color:#1d4ed8!important; box-shadow:0 0 14px var(--blue-glow); animation:gpsGlow 2s ease-in-out infinite; }
+    .rb.on-red    { background:rgba(220,38,38,.14)!important; color:var(--red)!important; border-color:rgba(220,38,38,.35)!important; }
+    @keyframes gpsGlow {
+      0%,100% { box-shadow:0 0 10px var(--blue-glow); }
+      50%      { box-shadow:0 0 22px rgba(37,99,235,0.55); }
+    }
 
-        .dock-slider-container { display: flex; flex-direction: column; align-items: center; width: 100%; padding: 4px 0; }
-        .dock-slider { -webkit-appearance: none; width: 32px; height: 4px; background: #555; border-radius: 2px; outline: none; }
-        .dock-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #E66100; cursor: pointer; }
+    /* tooltip */
+    .rb[data-tip]::after {
+      content:attr(data-tip);
+      position:absolute; left:calc(100% + 11px); top:50%;
+      transform:translateY(-50%) translateX(-6px);
+      background:var(--surface); color:var(--text);
+      font-family:var(--font); font-size:11px; font-weight:700; letter-spacing:.4px;
+      white-space:nowrap; padding:4px 10px;
+      border-radius:var(--r-sm); border:1px solid var(--border-hi);
+      box-shadow:var(--sh-sm); pointer-events:none;
+      opacity:0; transition:opacity var(--t1) var(--ease), transform var(--t1) var(--ease);
+    }
+    .rb[data-tip]:hover::after { opacity:1; transform:translateY(-50%) translateX(0); }
 
-        /* GPS BLUE DOT CSS */
-        .blue-dot-container { display: flex !important; align-items: center !important; justify-content: center !important; position: relative !important; }
-        .blue-dot { width: 12px; height: 12px; background: #007bff; border: 2px solid #fff; border-radius: 50%; z-index: 5; box-shadow: 0 0 10px #007bff; }
-        .cross-v { position: absolute; width: 2px; height: 60px; background: rgba(0, 123, 255, 0.7); }
-        .cross-h { position: absolute; width: 60px; height: 2px; background: rgba(0, 123, 255, 0.7); }
+    /* ── SUB-TOOL GROUP ── */
+    .sub-group {
+      display:none; flex-direction:column; align-items:center; gap:4px;
+      background:rgba(255,255,255,.035); border:1px solid var(--border);
+      border-radius:var(--r-sm); padding:6px; width:92%;
+    }
+    .sub-group.open { display:flex; animation:sgIn var(--t2) var(--ease) both; }
+    @keyframes sgIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none} }
 
-        .leaflet-control-layers, .leaflet-control-geocoder { display: none !important; }
-        .leaflet-pm-toolbar { display: none !important; }
-    </style>
+    .mb {
+      width:30px; height:30px;
+      background:var(--surface-2); color:var(--text);
+      border:1px solid var(--border); border-radius:var(--r-sm);
+      font-size:12px; display:flex; align-items:center; justify-content:center;
+      cursor:pointer; transition:background var(--t1),transform var(--t1) var(--spring);
+    }
+    .mb:hover  { background:var(--surface-3); }
+    .mb:active { background:var(--amber); color:#000; transform:scale(.88); }
+    .mb-row    { display:flex; gap:4px; }
+
+    /* ── SLIDER ── */
+    .slider-wrap { display:flex; flex-direction:column; align-items:center; width:100%; padding:4px 0; }
+    input[type=range].vslider {
+      -webkit-appearance:none; width:30px; height:5px;
+      background:linear-gradient(to right, var(--accent) 0%, var(--surface-3) 0%);
+      border-radius:3px; outline:none; cursor:pointer;
+    }
+    input[type=range].vslider::-webkit-slider-thumb {
+      -webkit-appearance:none; width:13px; height:13px; border-radius:50%;
+      background:var(--accent); border:2px solid #fff;
+      box-shadow:0 0 6px var(--accent-glow); cursor:pointer;
+    }
+
+    /* ═══════════════════════════════════════════════════
+       SEARCH BAR
+    ═══════════════════════════════════════════════════ */
+    .searchbar {
+      position:absolute; top:14px; left:calc(var(--ribbon-w) + 24px); z-index:2000;
+      display:flex; align-items:center; gap:4px;
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--r-md); padding:5px 5px;
+      box-shadow:var(--sh-md);
+      transition:border-color var(--t1), box-shadow var(--t1);
+    }
+    .searchbar:focus-within { border-color:var(--border-hi); box-shadow:var(--sh-md), 0 0 0 2px rgba(229,92,0,.2); }
+    .searchbar input {
+      background:none; border:none; outline:none;
+      color:var(--text); font-family:var(--font); font-size:13px; font-weight:600; letter-spacing:.2px;
+      width:205px; padding:5px 8px;
+    }
+    .searchbar input::placeholder { color:var(--text-dim); font-weight:400; }
+    .searchbar button {
+      background:var(--accent); color:#fff; border:none;
+      width:32px; height:32px; border-radius:var(--r-sm);
+      font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+      transition:background var(--t1), transform var(--t1) var(--spring);
+    }
+    .searchbar button:hover  { background:var(--accent-hi); }
+    .searchbar button:active { transform:scale(.88); }
+
+    /* ═══════════════════════════════════════════════════
+       HUD STATUS BADGE (top-right)
+    ═══════════════════════════════════════════════════ */
+    .hud-badge {
+      position:absolute; top:14px; right:14px; z-index:2000;
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--r-md); padding:8px 13px;
+      font-family:var(--mono); font-size:9.5px; letter-spacing:.4px; color:var(--text-mid);
+      box-shadow:var(--sh-sm); display:flex; flex-direction:column; gap:4px; min-width:134px;
+    }
+    .badge-row { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .badge-val { color:var(--text); font-weight:500; }
+    .gps-dot {
+      display:inline-block; width:7px; height:7px; border-radius:50%;
+      background:var(--text-dim); margin-right:5px; vertical-align:middle;
+      transition:background var(--t2), box-shadow var(--t2);
+    }
+    .gps-dot.live { background:var(--blue-light); box-shadow:0 0 0 3px rgba(96,165,250,.25), 0 0 8px var(--blue-light); animation:dotPulse 2s ease-in-out infinite; }
+    @keyframes dotPulse { 50%{ box-shadow:0 0 0 6px rgba(96,165,250,.1), 0 0 14px var(--blue-light); } }
+
+    /* ═══════════════════════════════════════════════════
+       MAGNIFIER
+    ═══════════════════════════════════════════════════ */
+    #zoomBox {
+      position:absolute; top:68px; left:calc(var(--ribbon-w) + 24px);
+      width:138px; height:138px; z-index:3000;
+      border:2px solid var(--blue); border-radius:var(--r-md);
+      background:#000; display:none; pointer-events:none; overflow:hidden;
+      box-shadow:var(--sh-md), 0 0 0 1px rgba(37,99,235,.2);
+    }
+    #zoomBox::after {
+      content:'◎ MAGNIFY'; position:absolute; bottom:5px; left:50%; transform:translateX(-50%);
+      font-family:var(--mono); font-size:7.5px; letter-spacing:1.2px; color:rgba(96,165,250,.5);
+    }
+    /* crosshair reticle */
+    #zoomBox::before {
+      content:''; position:absolute; inset:0; pointer-events:none; z-index:1;
+      background: linear-gradient(rgba(37,99,235,.15) 1px,transparent 1px) center/100% 50%,
+                  linear-gradient(90deg,rgba(37,99,235,.15) 1px,transparent 1px) center/50% 100%;
+    }
+
+    /* ═══════════════════════════════════════════════════
+       BOTTOM PANEL
+    ═══════════════════════════════════════════════════ */
+    .ctrl-panel {
+      position:absolute; bottom:22px; left:50%; transform:translateX(-50%); z-index:2000;
+      display:flex; gap:8px; align-items:center;
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--r-pill); padding:8px 18px; box-shadow:var(--sh-md);
+    }
+    .btn {
+      display:inline-flex; align-items:center; gap:7px;
+      border:none; border-radius:var(--r-pill); cursor:pointer;
+      font-family:var(--font); font-size:11.5px; font-weight:700; letter-spacing:.8px; text-transform:uppercase;
+      padding:9px 20px; text-decoration:none;
+      transition:filter var(--t1), transform var(--t1) var(--spring), box-shadow var(--t1);
+    }
+    .btn:hover  { filter:brightness(1.15); box-shadow:0 4px 18px rgba(0,0,0,.4); }
+    .btn:active { transform:scale(.94); }
+    .btn-export  { background:var(--accent); color:#fff; }
+    .btn-import  { background:var(--surface-3); color:var(--text); border:1px solid var(--border-hi); }
+
+    /* ═══════════════════════════════════════════════════
+       TOAST NOTIFICATIONS (replaces alert)
+    ═══════════════════════════════════════════════════ */
+    #toast-root {
+      position:fixed; bottom:80px; right:16px; z-index:9999;
+      display:flex; flex-direction:column; gap:8px; align-items:flex-end; pointer-events:none;
+    }
+    .toast {
+      display:flex; align-items:flex-start; gap:10px;
+      background:var(--surface); border:1px solid var(--border-hi);
+      border-radius:var(--r-md); padding:11px 16px;
+      box-shadow:var(--sh-lg); max-width:300px; pointer-events:auto;
+      animation:toastIn var(--t2) var(--spring) both;
+      border-left:3px solid var(--accent);
+    }
+    .toast.info  { border-left-color:var(--blue); }
+    .toast.ok    { border-left-color:var(--green); }
+    .toast.warn  { border-left-color:var(--amber); }
+    .toast.error { border-left-color:var(--red); }
+    .toast.out   { animation:toastOut var(--t2) var(--ease) both; }
+    @keyframes toastIn  { from{opacity:0;transform:translateX(16px)} to{opacity:1;transform:none} }
+    @keyframes toastOut { to{opacity:0;transform:translateX(16px)} }
+    .toast-icon { font-size:14px; margin-top:1px; flex-shrink:0; }
+    .toast.info  .toast-icon { color:var(--blue-light); }
+    .toast.ok    .toast-icon { color:#4ade80; }
+    .toast.warn  .toast-icon { color:#fbbf24; }
+    .toast.error .toast-icon { color:#f87171; }
+    .toast-msg { font-family:var(--font); font-size:12px; line-height:1.55; color:var(--text); }
+
+    /* ═══════════════════════════════════════════════════
+       CONFIRM MODAL (replaces confirm)
+    ═══════════════════════════════════════════════════ */
+    .modal-backdrop {
+      position:fixed; inset:0; z-index:9998; background:rgba(0,0,0,.7);
+      display:none; align-items:center; justify-content:center;
+      animation:fadeIn var(--t2) var(--ease);
+    }
+    .modal-backdrop.open { display:flex; }
+    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+    .modal {
+      background:var(--surface); border:1px solid var(--border-hi);
+      border-radius:var(--r-lg); padding:24px 28px; max-width:340px; width:90%;
+      box-shadow:var(--sh-lg); animation:modalIn var(--t2) var(--spring) both;
+    }
+    @keyframes modalIn { from{opacity:0;transform:scale(.94) translateY(8px)} to{opacity:1;transform:none} }
+    .modal-title { font-size:15px; font-weight:700; margin-bottom:10px; color:var(--text); }
+    .modal-body  { font-size:12.5px; color:var(--text-mid); line-height:1.6; margin-bottom:20px; }
+    .modal-actions { display:flex; gap:10px; justify-content:flex-end; }
+    .modal-btn {
+      padding:8px 20px; border:none; border-radius:var(--r-sm);
+      font-family:var(--font); font-size:12px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+      cursor:pointer; transition:filter var(--t1), transform var(--t1) var(--spring);
+    }
+    .modal-btn:hover  { filter:brightness(1.15); }
+    .modal-btn:active { transform:scale(.93); }
+    .modal-btn.cancel { background:var(--surface-3); color:var(--text-mid); }
+    .modal-btn.confirm { background:var(--red); color:#fff; }
+
+    /* ═══════════════════════════════════════════════════
+       GPS CROSSHAIR
+    ═══════════════════════════════════════════════════ */
+    .blue-dot-container { display:flex!important; align-items:center!important; justify-content:center!important; position:relative!important; }
+    .blue-dot {
+      width:12px; height:12px;
+      background:var(--blue-light); border:2.5px solid #fff; border-radius:50%; z-index:5;
+      box-shadow:0 0 0 4px rgba(96,165,250,.2), 0 0 16px var(--blue-light);
+      animation:dotPulse 2s ease-in-out infinite;
+    }
+    .cross-v { position:absolute; width:1.5px; height:60px; background:rgba(96,165,250,.55); }
+    .cross-h { position:absolute; height:1.5px; width:60px;  background:rgba(96,165,250,.55); }
+
+    /* ═══════════════════════════════════════════════════
+       POPUP STYLES
+    ═══════════════════════════════════════════════════ */
+    .leaflet-popup-content-wrapper {
+      background:var(--surface); border:1px solid var(--border-hi);
+      border-radius:var(--r-md); box-shadow:var(--sh-md);
+      color:var(--text); font-family:var(--font); font-size:12.5px;
+    }
+    .leaflet-popup-tip-container .leaflet-popup-tip { background:var(--surface); }
+    .leaflet-popup-close-button { color:var(--text-dim)!important; font-size:16px!important; }
+    .p-nav, .p-del {
+      display:block; width:100%; margin-top:7px; padding:7px 12px;
+      border:none; border-radius:var(--r-sm); cursor:pointer;
+      font-family:var(--font); font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+      transition:filter var(--t1); text-align:center;
+    }
+    .p-nav { background:var(--green); color:#fff; }
+    .p-del { background:var(--red);   color:#fff; }
+    .p-nav:hover, .p-del:hover { filter:brightness(1.2); }
+    .area-label { font-size:11px; color:var(--text-mid); margin-top:3px; }
+
+    /* ═══════════════════════════════════════════════════
+       WMS FILTER
+    ═══════════════════════════════════════════════════ */
+    .wms-style-force { filter:contrast(400%) brightness(50%) saturate(8) hue-rotate(320deg)!important; opacity:.9; }
+
+    /* ═══════════════════════════════════════════════════
+       HIDE NATIVE CONTROLS
+    ═══════════════════════════════════════════════════ */
+    .leaflet-control-layers, .leaflet-control-geocoder, .leaflet-pm-toolbar { display:none!important; }
+
+    /* ═══════════════════════════════════════════════════
+       BOOT SPLASH
+    ═══════════════════════════════════════════════════ */
+    #splash {
+      position:fixed; inset:0; z-index:9999; background:var(--bg);
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+      transition:opacity var(--t3) var(--ease);
+    }
+    #splash.gone { opacity:0; pointer-events:none; }
+    .splash-logo { font-size:28px; font-weight:800; letter-spacing:-.5px; }
+    .splash-logo span { color:var(--accent); }
+    .splash-sub  { font-family:var(--mono); font-size:10px; letter-spacing:2px; color:var(--text-dim); text-transform:uppercase; }
+    .spin-ring {
+      width:44px; height:44px;
+      border:3px solid var(--border); border-top-color:var(--accent);
+      border-radius:50%; animation:spin .7s linear infinite;
+    }
+    @keyframes spin { to{transform:rotate(360deg)} }
+  </style>
 </head>
+
 <body class="show-ui">
 
+<!-- BOOT SPLASH -->
+<div id="splash">
+  <p class="splash-logo">Murali <span>GIS</span></p>
+  <div class="spin-ring"></div>
+  <p class="splash-sub">Loading map engine…</p>
+</div>
+
+<!-- MAP + MAGNIFIER -->
 <div id="map"></div>
-<div id="zoomBox"></div> 
+<div id="zoomBox"></div>
 
-<div class="search-container">
-    <input type="text" id="searchInput" placeholder="Search Place or Lat, Lng...">
-    <button onclick="executeLocationSearch()"><i class="fa-solid fa-magnifying-glass"></i></button>
+<!-- SEARCH BAR -->
+<div class="searchbar hud" id="searchBar">
+  <input type="text" id="searchInput" placeholder="Search place or lat, lng…" autocomplete="off" />
+  <button id="searchBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
 </div>
 
-<div class="ubuntu-unified-ribbon" id="unifiedRibbon">
-    
-    <button class="ribbon-btn" id="customGpsBtn" title="Live GPS Location" onclick="toggleGpsService()">
-        <i class="fa-solid fa-crosshairs"></i>
-    </button>
-    
-    <div class="ribbon-divider"></div>
-    
-    <button class="ribbon-btn" id="customLineBtn" title="Draw Line (Auto-Snap)" onclick="triggerLeafletDraw('Line')">
-        <i class="fa-solid fa-file-signature"></i>
-    </button>
-    <button class="ribbon-btn" id="customPolygonBtn" title="Draw Polygon (Auto-Snap)" onclick="triggerLeafletDraw('Polygon')">
-        <i class="fa-solid fa-draw-polygon"></i>
-    </button>
-    <button class="ribbon-btn" id="customMarkerBtn" title="Save Note" onclick="triggerLeafletDraw('Marker')">
-        <i class="fa-solid fa-location-dot"></i>
-    </button>
-
-    <button class="ribbon-btn" id="customEditBtn" title="Edit / Rearrange Polygons" onclick="toggleEditMode()">
-        <i class="fa-solid fa-pen-to-square"></i>
-    </button>
-
-    <button class="ribbon-btn" id="customEraseBtn" title="Erase / Delete Drawings" onclick="expandTool('erase')">
-        <i class="fa-solid fa-eraser"></i>
-    </button>
-    <div class="sub-tool-group" id="group-erase">
-        <button class="mini-ribbon-btn" id="eraseModeToggleBtn" title="Touch to Erase" onclick="toggleEraseMode()">
-            <i class="fa-solid fa-hand-pointer"></i>
-        </button>
-        <button class="mini-ribbon-btn" style="background:#dc3545;" title="Clear All Drawings" onclick="clearAllDrawings()">
-            <i class="fa-solid fa-trash-can"></i>
-        </button>
-    </div>
-    
-    <div class="ribbon-divider"></div>
-    
-    <button class="ribbon-btn" id="customLayerBtn" title="Map Layers" onclick="expandTool('layers')">
-        <i class="fa-solid fa-layer-group"></i>
-    </button>
-    <div class="sub-tool-group" id="group-layers">
-        <button class="mini-ribbon-btn" title="Google Hybrid" onclick="switchBaseLayer('hybrid')">H</button>
-        <button class="mini-ribbon-btn" title="Google Road" onclick="switchBaseLayer('road')">R</button>
-        <button class="mini-ribbon-btn" title="OpenStreetMap" onclick="switchBaseLayer('osm')">O</button>
-        <div style="width:100%; height:1px; background:rgba(255,255,255,0.2); margin:4px 0;"></div>
-        <button class="mini-ribbon-btn" id="layerToggleVillage" title="Toggle Village WMS" onclick="toggleWmsOverlay('village')" style="background:#ffc107; color:#000;">V</button>
-        <button class="mini-ribbon-btn" id="layerToggleCadastral" title="Toggle Cadastral WMS" onclick="toggleWmsOverlay('cadastral')">C</button>
-    </div>
-    
-    <div class="ribbon-divider"></div>
-
-    <label class="ribbon-btn fmb-load-btn" title="Load FMB Image/PDF">
-        <i class="fa-solid fa-image"></i> <input type="file" id="uploadFMB" accept=".jpg,.jpeg,.png,.pdf" style="display:none">
-    </label>
-    
-    <div id="fmbTools" style="display: none; flex-direction: column; align-items: center; gap: 8px; width: 100%;">
-        
-        <div class="ribbon-divider"></div>
-
-        <button id="touchToggleBtn" class="ribbon-btn" title="Touch Move Mode" onclick="toggleFMBTouch()">
-            <i class="fa-solid fa-hand-pointer"></i>
-        </button>
-
-        <div class="ribbon-divider"></div>
-
-        <button class="ribbon-btn" id="mainMoveBtn" title="Move FMB" onclick="expandTool('move')">
-            <span>↖</span>
-        </button>
-        <div class="sub-tool-group" id="group-move">
-            <button class="mini-ribbon-btn" onclick="adjustFMB('up')">↑</button>
-            <button class="mini-ribbon-btn" onclick="adjustFMB('down')">↓</button>
-            <button class="mini-ribbon-btn" onclick="adjustFMB('left')">←</button>
-            <button class="mini-ribbon-btn" onclick="adjustFMB('right')">→</button>
-        </div>
-
-        <div class="ribbon-divider"></div>
-
-        <button class="ribbon-btn" id="mainScaleBtn" title="Resize FMB" onclick="expandTool('scale')">
-            <span>↗</span>
-        </button>
-        <div class="sub-tool-group" id="group-scale">
-            <button class="mini-ribbon-btn" onclick="adjustFMB('zoomin')">+</button>
-            <button class="mini-ribbon-btn" onclick="adjustFMB('zoomout')">-</button>
-        </div>
-
-        <div class="ribbon-divider"></div>
-
-        <button class="ribbon-btn" id="mainRotateBtn" title="Rotate FMB" onclick="expandTool('rotate')">
-            <span>↻</span>
-        </button>
-        <div class="sub-tool-group" id="group-rotate">
-            <button class="mini-ribbon-btn" onclick="adjustFMB('rotL')">↰</button>
-            <button class="mini-ribbon-btn" onclick="adjustFMB('rotR')">↱</button>
-        </div>
-
-        <div class="ribbon-divider"></div>
-
-        <button class="ribbon-btn" id="mainOpacityBtn" title="FMB Opacity" onclick="expandTool('opacity')">
-            <i class="fa-solid fa-eye"></i>
-        </button>
-        <div class="sub-tool-group" id="group-opacity">
-            <div class="dock-slider-container">
-                <input type="range" id="fmbOpacity" class="dock-slider" min="0.1" max="1" step="0.1" value="0.6">
-            </div>
-        </div>
-
-        <div class="ribbon-divider"></div>
-
-        <button class="ribbon-btn" style="background: rgba(220,53,69,0.15); color:#dc3545;" title="Remove FMB" onclick="removeFMB()">
-            <i class="fa-solid fa-trash"></i>
-        </button>
-    </div>
+<!-- HUD STATUS BADGE -->
+<div class="hud-badge hud" id="hudBadge">
+  <div class="badge-row">
+    <span><span class="gps-dot" id="gpsDot"></span>GPS</span>
+    <span class="badge-val" id="badgeGps">—</span>
+  </div>
+  <div class="badge-row">
+    <span>ZOOM</span>
+    <span class="badge-val" id="badgeZoom">16</span>
+  </div>
+  <div class="badge-row">
+    <span>LAYER</span>
+    <span class="badge-val" id="badgeLayer">HYB</span>
+  </div>
 </div>
 
-<div class="control-panel">
-    <button class="btn" onclick="downloadKML()"><i class="fa-solid fa-file-export"></i> Save KML</button>
-    <label class="btn" style="background: #6c757d;">
-        <i class="fa-solid fa-file-import"></i> Load KML <input type="file" id="uploadFile" accept=".kml,.json,.geojson" style="display:none">
-    </label>
+<!-- LEFT RIBBON -->
+<div class="ribbon hud" id="ribbon">
+  <button class="rb" id="gpsBtn" data-tip="Live GPS" onclick="GIS.GPS.toggle()"><i class="fa-solid fa-crosshairs"></i></button>
+  <div class="rdiv"></div>
+
+  <button class="rb" id="lineBtn"    data-tip="Draw Line"    onclick="GIS.Draw.trigger('Line')">   <i class="fa-solid fa-file-signature"></i></button>
+  <button class="rb" id="polygonBtn" data-tip="Draw Polygon" onclick="GIS.Draw.trigger('Polygon')"><i class="fa-solid fa-draw-polygon"></i></button>
+  <button class="rb" id="markerBtn"  data-tip="Save Note"    onclick="GIS.Draw.trigger('Marker')"> <i class="fa-solid fa-location-dot"></i></button>
+  <button class="rb" id="editBtn"    data-tip="Edit Shapes"  onclick="GIS.Draw.toggleEdit()">      <i class="fa-solid fa-pen-to-square"></i></button>
+
+  <button class="rb" id="eraseBtn" data-tip="Erase Tools" onclick="GIS.UI.expand('erase')"><i class="fa-solid fa-eraser"></i></button>
+  <div class="sub-group" id="group-erase">
+    <button class="mb" id="eraseModeBtn" title="Touch Erase" onclick="GIS.Draw.toggleErase()"><i class="fa-solid fa-hand-pointer"></i></button>
+    <button class="mb" title="Clear All"  onclick="GIS.Draw.clearAll()"  style="color:var(--red)"><i class="fa-solid fa-trash-can"></i></button>
+  </div>
+
+  <div class="rdiv"></div>
+
+  <button class="rb" id="layerBtn" data-tip="Layers" onclick="GIS.UI.expand('layers')"><i class="fa-solid fa-layer-group"></i></button>
+  <div class="sub-group" id="group-layers">
+    <button class="mb" title="Hybrid"       onclick="GIS.Layers.setBase('hybrid')" style="font-size:9px;font-weight:800;letter-spacing:.5px">HYB</button>
+    <button class="mb" title="Road"         onclick="GIS.Layers.setBase('road')"   style="font-size:9px;font-weight:800;letter-spacing:.5px">ROAD</button>
+    <button class="mb" title="OpenStreetMap"onclick="GIS.Layers.setBase('osm')"    style="font-size:9px;font-weight:800;letter-spacing:.5px">OSM</button>
+    <div style="width:100%;height:1px;background:var(--border);margin:3px 0"></div>
+    <button class="mb" id="btnVil" title="Village WMS"    onclick="GIS.Layers.toggleWms('village')"   style="background:var(--amber);color:#000;font-size:9px;font-weight:800">VIL</button>
+    <button class="mb" id="btnCad" title="Cadastral WMS"  onclick="GIS.Layers.toggleWms('cadastral')" style="font-size:9px;font-weight:800">CAD</button>
+  </div>
+
+  <div class="rdiv"></div>
+
+  <label class="rb on-green" data-tip="Load FMB" title="Load FMB Image/PDF">
+    <i class="fa-solid fa-image"></i>
+    <input type="file" id="uploadFMB" accept=".jpg,.jpeg,.png,.pdf" style="display:none" />
+  </label>
+
+  <!-- FMB tools (shown after load) -->
+  <div id="fmbTools" style="display:none;flex-direction:column;align-items:center;gap:5px;width:100%">
+    <div class="rdiv"></div>
+    <button class="rb" id="touchMoveBtn" data-tip="Touch Move" onclick="GIS.FMB.toggleTouch()"><i class="fa-solid fa-hand-pointer"></i></button>
+    <div class="rdiv"></div>
+
+    <button class="rb" id="mainMoveBtn" data-tip="Move FMB" onclick="GIS.UI.expand('move')"><i class="fa-solid fa-arrows-up-down-left-right"></i></button>
+    <div class="sub-group" id="group-move">
+      <button class="mb" onclick="GIS.FMB.adjust('up')">↑</button>
+      <div class="mb-row">
+        <button class="mb" onclick="GIS.FMB.adjust('left')">←</button>
+        <button class="mb" onclick="GIS.FMB.adjust('right')">→</button>
+      </div>
+      <button class="mb" onclick="GIS.FMB.adjust('down')">↓</button>
+    </div>
+
+    <button class="rb" id="mainScaleBtn" data-tip="Resize FMB" onclick="GIS.UI.expand('scale')"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
+    <div class="sub-group" id="group-scale">
+      <button class="mb" onclick="GIS.FMB.adjust('zoomin')"><i class="fa-solid fa-plus"></i></button>
+      <button class="mb" onclick="GIS.FMB.adjust('zoomout')"><i class="fa-solid fa-minus"></i></button>
+    </div>
+
+    <button class="rb" id="mainRotateBtn" data-tip="Rotate FMB" onclick="GIS.UI.expand('rotate')"><i class="fa-solid fa-rotate"></i></button>
+    <div class="sub-group" id="group-rotate">
+      <button class="mb" onclick="GIS.FMB.adjust('rotL')"><i class="fa-solid fa-rotate-left"></i></button>
+      <button class="mb" onclick="GIS.FMB.adjust('rotR')"><i class="fa-solid fa-rotate-right"></i></button>
+    </div>
+
+    <button class="rb" id="mainOpacityBtn" data-tip="Opacity" onclick="GIS.UI.expand('opacity')"><i class="fa-solid fa-circle-half-stroke"></i></button>
+    <div class="sub-group" id="group-opacity">
+      <div class="slider-wrap">
+        <input type="range" id="fmbOpacity" class="vslider" min="0.1" max="1" step="0.05" value="0.6" />
+      </div>
+    </div>
+
+    <div class="rdiv"></div>
+    <button class="rb on-red" data-tip="Remove FMB" onclick="GIS.FMB.remove()"><i class="fa-solid fa-trash"></i></button>
+  </div>
 </div>
 
+<!-- BOTTOM PANEL -->
+<div class="ctrl-panel hud" id="ctrlPanel">
+  <button class="btn btn-export" onclick="GIS.IO.exportKML()"><i class="fa-solid fa-file-export"></i>Save KML</button>
+  <label class="btn btn-import">
+    <i class="fa-solid fa-file-import"></i>Load KML
+    <input type="file" id="uploadFile" accept=".kml,.json,.geojson" style="display:none" />
+  </label>
+</div>
+
+<!-- TOAST ROOT -->
+<div id="toast-root"></div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">Confirm</div>
+    <div class="modal-body"  id="modalBody">Are you sure?</div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel"  id="modalCancel">Cancel</button>
+      <button class="modal-btn confirm" id="modalConfirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCRIPTS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
@@ -247,479 +519,606 @@
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
 
 <script>
-    var pdfjsLib = window['pdfjs-dist/build/pdf'];
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+/* ════════════════════════════════════════════════════════════
+   MURALI MASTER GIS  ·  Modular Architecture  ·  ES2020+
+════════════════════════════════════════════════════════════ */
+'use strict';
 
-    // 1. MAP & BASE LAYERS INITIALIZATION
-    var gHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
-    var gRoad = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] });
-    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22 });
+(() => {
+  /* ── pdf.js ─────────────────────────────────────────── */
+  const pdfjsLib = window['pdfjs-dist/build/pdf'];
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-    var map = L.map('map', { center: [11.196, 76.227], zoom: 16, layers: [gHybrid], zoomControl: false, tap: false });
-    
-    // HIGH-PRIORITY CADASTRAL PANE
-    map.createPane('cadastralPane');
-    map.getPane('cadastralPane').style.zIndex = 600; 
-    map.getPane('cadastralPane').style.pointerEvents = 'none';
+  /* ── CONSTANTS ──────────────────────────────────────── */
+  const STORAGE_KEY   = 'murali_gis_v11';
+  const BHUVAN_URL    = 'https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms';
+  const DEFAULT_VIEW  = { lat: 11.196, lng: 76.227, zoom: 16 };
+  const TOOL_GROUPS   = ['move','scale','rotate','opacity','layers','erase'];
 
-    var bhuvanURL = 'https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms';
-    var vLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:village', format: 'image/png', transparent: true, className: 'wms-style-force', maxZoom: 22, tileSize: 512, zoomOffset: -1, pane: 'cadastralPane' });
-    var cLayer = L.tileLayer.wms(bhuvanURL, { layers: 'v3:cadastral', format: 'image/png', transparent: true, maxZoom: 22, tileSize: 512, zoomOffset: -1, pane: 'cadastralPane' });
-
-    map.addLayer(vLayer);
-    var baseLayerGroup = { 'hybrid': gHybrid, 'road': gRoad, 'osm': osm };
-
-    // MAGNIFIER MIRROR SETUP
-    var miniMap = L.map('zoomBox', { attributionControl: false, zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false });
-    L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 22, subdomains:['mt0','mt1','mt2','mt3'] }).addTo(miniMap);
-    
-    miniMap.createPane('cadastralPaneMini');
-    miniMap.getPane('cadastralPaneMini').style.zIndex = 600;
-    miniMap.getPane('cadastralPaneMini').style.pointerEvents = 'none';
-
-    var vLayerMini = L.tileLayer.wms(bhuvanURL, { layers: 'v3:village', format: 'image/png', transparent: true, className: 'wms-style-force', maxZoom: 22, tileSize: 512, zoomOffset: -1, pane: 'cadastralPaneMini' });
-    var cLayerMini = L.tileLayer.wms(bhuvanURL, { layers: 'v3:cadastral', format: 'image/png', transparent: true, maxZoom: 22, tileSize: 512, zoomOffset: -1, pane: 'cadastralPaneMini' });
-    
-    var drawnItemsMini = L.featureGroup().addTo(miniMap);
-    var fmbMiniGroup = L.featureGroup().addTo(miniMap);
-
-    if (map.hasLayer(vLayer)) miniMap.addLayer(vLayerMini);
-
-    function switchBaseLayer(layerKey) {
-        for (var key in baseLayerGroup) { map.removeLayer(baseLayerGroup[key]); }
-        map.addLayer(baseLayerGroup[layerKey]);
-    }
-
-    function toggleWmsOverlay(layerType) {
-        var layer = (layerType === 'village') ? vLayer : cLayer;
-        var miniLayer = (layerType === 'village') ? vLayerMini : cLayerMini;
-        var btn = document.getElementById(layerType === 'village' ? 'layerToggleVillage' : 'layerToggleCadastral');
-        
-        if (map.hasLayer(layer)) {
-            map.removeLayer(layer);
-            miniMap.removeLayer(miniLayer);
-            btn.style.background = 'rgba(255,255,255,0.2)'; btn.style.color = '#fff';
-        } else {
-            map.addLayer(layer);
-            miniMap.addLayer(miniLayer);
-            btn.style.background = '#ffc107'; btn.style.color = '#000';
-        }
-    }
-
-    // --- SEARCH LOGIC ---
-    var currentSearchMarker = null;
-
-    function executeLocationSearch() {
-        var input = document.getElementById('searchInput').value;
-        if (!input) return;
-
-        if (currentSearchMarker) map.removeLayer(currentSearchMarker);
-
-        var parts = input.trim().split(/[\s,]+/);
-        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-            var lat = parseFloat(parts[0]), lng = parseFloat(parts[1]);
-            map.setView([lat, lng], 16);
-            currentSearchMarker = L.marker([lat, lng]).addTo(map).bindPopup("Coordinates: " + lat + ", " + lng).openPopup();
-            return;
-        }
-
-        var url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(input);
-        fetch(url)
-            .then(response => response.json())
-            .then(data => {
-                if (data.length > 0) {
-                    var place = data[0];
-                    var lat = parseFloat(place.lat);
-                    var lng = parseFloat(place.lon);
-                    
-                    map.setView([lat, lng], 15);
-                    currentSearchMarker = L.marker([lat, lng]).addTo(map)
-                        .bindPopup("<b>" + place.display_name + "</b>")
-                        .openPopup();
-                } else {
-                    alert("Place not found!");
-                }
-            })
-            .catch(err => alert("Search error. Check internet."));
-    }
-
-    document.getElementById('searchInput').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            executeLocationSearch();
-        }
-    });
-
-    // 2. DRAWING SYSTEM (GEOMAN FREE WITH SNAPPING & REARRANGE EDIT INTERFACE & HIGHLIGHT)
-    var drawnItems = new L.FeatureGroup().addTo(map);
-    var vectorMap = {};
-
-    map.pm.addControls({ drawMarker: false, drawPolygon: false, drawPolyline: false, editMode: false, dragMode: false, cutPolygon: false, removalMode: false });
-    map.pm.setGlobalOptions({ snappable: true, snapDistance: 25, snapMiddle: true, layerGroup: map });
-    
-    // ടൂളുകളുടെ ഹൈലൈറ്റ് മാറ്റാൻ
-    function clearDrawHighlights() {
-        document.getElementById('customLineBtn').classList.remove('active-main');
-        document.getElementById('customPolygonBtn').classList.remove('active-main');
-        document.getElementById('customMarkerBtn').classList.remove('active-main');
-    }
-
-    function triggerLeafletDraw(toolType) {
-        if (isEditing) toggleEditMode();
-        if (isEraseMode) toggleEraseMode();
-
-        var wasActive = (map.pm.GlobalDrawMode === toolType);
-        
-        clearDrawHighlights(); // പഴയ ടൂളിന്റെ ഹൈലൈറ്റ് മാറ്റുന്നു
-
-        if (wasActive) {
-            map.pm.disableDraw();
-        } else {
-            map.pm.enableDraw(toolType);
-            // സെലക്ട് ചെയ്ത പുതിയ ടൂൾ ഓറഞ്ച് നിറത്തിൽ Highlight ചെയ്യുന്നു
-            document.getElementById('custom' + toolType + 'Btn').classList.add('active-main');
-        }
-    }
-
-    // വരയ്ക്കുന്നത് ക്യാൻസൽ ആയാൽ Highlight തനിയെ പോകാൻ
-    map.on('pm:globaldrawmodetoggled', (e) => {
-        if (!e.enabled) {
-            clearDrawHighlights();
-        }
-    });
-
-    var isEraseMode = false;
-    function toggleEraseMode() {
-        if (map.pm.GlobalDrawMode) map.pm.disableDraw();
-        if (isEditing) toggleEditMode();
-        map.pm.toggleGlobalRemovalMode();
-        isEraseMode = map.pm.globalRemovalModeEnabled();
-        var btn = document.getElementById('eraseModeToggleBtn');
-        if(isEraseMode) {
-            btn.style.background = '#ffc107'; btn.style.color = '#000';
-            document.body.classList.add('show-ui');
-            alert("Erase Mode ON: നിങ്ങൾ വരച്ച ലൈനുകളിലോ പോളിഗണുകളിലോ തൊട്ടാൽ അവ മാഞ്ഞുപോകും. ഒഴിവാക്കിയ ശേഷം ഈ ബട്ടൺ വീണ്ടും അമർത്തി OFF ആക്കുക.");
-        } else {
-            btn.style.background = 'rgba(255,255,255,0.2)'; btn.style.color = '#fff';
-            showUI();
-        }
-    }
-
-    var isEditing = false;
-    function toggleEditMode() {
-        if (map.pm.GlobalDrawMode) map.pm.disableDraw();
-        if (isEraseMode) toggleEraseMode();
-        map.pm.toggleGlobalEditMode();
-        isEditing = map.pm.globalEditModeEnabled();
-        var btn = document.getElementById('customEditBtn');
-        if (isEditing) {
-            btn.classList.add('active-main');
-            document.body.classList.add('show-ui');
-            alert("Edit Mode ON: നിങ്ങൾ വരച്ച ലൈനുകളിലോ പോളിഗണുകളിലോ തൊട്ടാൽ bend point-ുകൾ കാണാം. അവ drag ചെയ്ത് rearrange ചെയ്യുക. കഴിഞ്ഞ ശേഷം ഈ ബട്ടൺ വീണ്ടും അമർത്തി OFF ആക്കുക.");
-        } else {
-            btn.classList.remove('active-main');
-            showUI();
-        }
-    }
-
-    function clearAllDrawings() {
-        if(confirm("നിങ്ങൾ വരച്ചതെല്ലാം മായ്ച്ചു കളയണോ? (Clear all drawings?)")) {
-            drawnItems.clearLayers();
-            drawnItemsMini.clearLayers();
-            vectorMap = {};
-            map.eachLayer(function(layer){ if(layer.pm && layer instanceof L.Path){ map.removeLayer(layer); } });
-            if(isEraseMode) toggleEraseMode();
-            if(isEditing) toggleEditMode();
-        }
-    }
-
-    drawnItems.on('layerremove', function(e3) { 
-        var originalId = L.stamp(e3.layer);
-        var miniId = vectorMap[originalId];
-        var miniLayer = drawnItemsMini.getLayer(miniId);
-        if (miniLayer) drawnItemsMini.removeLayer(miniLayer);
-        delete vectorMap[originalId];
-    });
-
-    var isDrawing = false;
-    map.on('pm:drawstart', () => { isDrawing = true; document.getElementById('zoomBox').style.display = 'block'; document.body.classList.add('show-ui'); });
-    map.on('pm:drawend', () => { isDrawing = false; document.getElementById('zoomBox').style.display = 'none'; showUI(); });
-    map.on('mousemove', function(e) { if(isDrawing) { miniMap.setView(e.latlng, map.getZoom() + 3); } });
-
-    map.on('pm:create', (e) => {
-        var layer = e.layer; 
-        if (e.shape === 'Marker') {
-            var ll = layer.getLatLng(), txt = prompt("Save Note:");
-            if(txt) { savedNotes.push({lat: ll.lat, lng: ll.lng, text: txt}); localStorage.setItem('murali_final_v10', JSON.stringify(savedNotes)); renderNotes(); }
-            map.removeLayer(layer);
-        } else {
-            drawnItems.addLayer(layer);
-            if (e.shape === 'Polygon' || e.shape === 'Rectangle') {
-                var area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
-                layer.bindPopup(`<b>Area:</b><br>${(area * 0.000247).toFixed(3)} Acres<br>${(area * 0.0247).toFixed(2)} Cents`).openPopup();
-            }
-
-            var originalId = L.stamp(layer);
-            var style = { color: layer.options.color || '#3388ff', weight: layer.options.weight || 3, opacity: layer.options.opacity || 0.5, fillColor: layer.options.fillColor, fillOpacity: layer.options.fillOpacity };
-            
-            var miniLayer;
-            if (e.shape === 'Line') { miniLayer = L.polyline(layer.getLatLngs(), style).addTo(drawnItemsMini); } 
-            else if (e.shape === 'Polygon' || e.shape === 'Rectangle') { miniLayer = L.polygon(layer.getLatLngs(), style).addTo(drawnItemsMini); }
-            
-            if (miniLayer) {
-                vectorMap[originalId] = L.stamp(miniLayer);
-                layer.on('pm:edit', function(e2) {
-                    var mId = vectorMap[L.stamp(layer)];
-                    var mLayer = drawnItemsMini.getLayer(mId);
-                    if (mLayer) mLayer.setLatLngs(layer.getLatLngs());
-                });
-            }
-        }
-    });
-
-    // 3. FMB PDF & SVG OVERLAY GEOMAN ALIGNMENT SYSTEM
-    var fmbSvgOverlay = null;
-    var fmbSvgOverlayMini = null;
-    var fmbImgDataUrl = "";
-    var fmbLat, fmbLng, fmbWidth = 0.003, fmbHeight = 0.003, fmbAngle = 0;
-
-    document.getElementById('uploadFMB').onchange = function(e) {
-        var file = e.target.files[0]; if (!file) return;
-        if (file.type === 'application/pdf') {
-            var fileReader = new FileReader();
-            fileReader.onload = function() {
-                var typedarray = new Uint8Array(this.result);
-                pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
-                    pdf.getPage(1).then(function(page) {
-                        var viewport = page.getViewport({scale: 2.0}); 
-                        var canvas = document.createElement('canvas');
-                        var context = canvas.getContext('2d');
-                        canvas.height = viewport.height; canvas.width = viewport.width;
-                        var renderContext = { canvasContext: context, viewport: viewport };
-                        page.render(renderContext).promise.then(function() {
-                            fmbImgDataUrl = canvas.toDataURL('image/png'); initFMBLayer();
-                        });
-                    });
-                }).catch(function(err) { alert("PDF Load Error: " + err.message); });
-            };
-            fileReader.readAsArrayBuffer(file);
-        } else if (file.type.match('image.*')) {
-            var reader = new FileReader();
-            reader.onload = function(event) { fmbImgDataUrl = event.target.result; initFMBLayer(); };
-            reader.readAsDataURL(file);
-        } else { alert("ദയവായി JPG, PNG അല്ലെങ്കിൽ PDF ഫയൽ മാത്രം നൽകുക."); }
-        e.target.value = ""; 
+  /* ── TOAST SYSTEM ───────────────────────────────────── */
+  const Toast = (() => {
+    const root = document.getElementById('toast-root');
+    const ICONS = { info:'fa-circle-info', ok:'fa-circle-check', warn:'fa-triangle-exclamation', error:'fa-circle-xmark' };
+    return {
+      show(msg, type = 'info', dur = 4000) {
+        const el = document.createElement('div');
+        el.className = `toast ${type}`;
+        el.innerHTML = `<i class="fa-solid ${ICONS[type]} toast-icon"></i><span class="toast-msg">${msg}</span>`;
+        root.appendChild(el);
+        setTimeout(() => { el.classList.add('out'); el.addEventListener('animationend', () => el.remove()); }, dur);
+      }
     };
+  })();
 
-    function initFMBLayer() {
-        var center = map.getCenter();
-        fmbLat = center.lat; fmbLng = center.lng; fmbAngle = 0; fmbWidth = 0.0025; fmbHeight = 0.0025;
-        renderSVGOverlay();
-        document.getElementById('fmbTools').style.display = 'flex';
-        showUI();
-    }
-
-    function renderSVGOverlay() {
-        if (!fmbImgDataUrl) return;
-        var sW = L.latLng(fmbLat - (fmbHeight/2), fmbLng - (fmbWidth/2));
-        var nE = L.latLng(fmbLat + (fmbHeight/2), fmbLng + (fmbWidth/2));
-        var bounds = L.latLngBounds(sW, nE);
-        
-        if (fmbSvgOverlay) map.removeLayer(fmbSvgOverlay);
-        if (fmbSvgOverlayMini) miniMap.removeLayer(fmbSvgOverlayMini);
-        
-        var svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svgElement.setAttribute('xmlns', "http://www.w3.org/2000/svg");
-        svgElement.setAttribute('viewBox', "0 0 100 100");
-        
-        var svgImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
-        svgImage.setAttribute('width', '100'); svgImage.setAttribute('height', '100');
-        svgImage.setAttributeNS("http://www.w3.org/1999/xlink", "href", fmbImgDataUrl); 
-        svgImage.setAttribute("href", fmbImgDataUrl);
-        svgImage.setAttribute('transform', `rotate(${fmbAngle} 50 50)`);
-        svgElement.appendChild(svgImage);
-        
-        fmbSvgOverlay = L.svgOverlay(svgElement, bounds, { pane: 'overlayPane', opacity: parseFloat(document.getElementById('fmbOpacity').value), interactive: false }).addTo(map);
-        
-        var svgClone = svgElement.cloneNode(true);
-        fmbSvgOverlayMini = L.svgOverlay(svgClone, bounds, { interactive: false, opacity: parseFloat(document.getElementById('fmbOpacity').value) }).addTo(miniMap);
-    }
-
-    function expandTool(toolName) {
-        var targetGroup = document.getElementById('group-' + toolName);
-        var mainButtons = ['Move', 'Scale', 'Rotate', 'Opacity', 'Layers', 'Erase'];
-        mainButtons.forEach(btn => {
-            var g = document.getElementById('group-' + btn.toLowerCase());
-            var b = document.getElementById('main' + btn + 'Btn') || document.getElementById('custom' + btn + 'Btn');
-            if (btn.toLowerCase() !== toolName) { if(g) g.style.display = 'none'; if(b) b.classList.remove('active-main'); }
-        });
-        if (targetGroup.style.display === 'flex') {
-            targetGroup.style.display = 'none';
-            var currentBtn = document.getElementById('main' + toolName.charAt(0).toUpperCase() + toolName.slice(1) + 'Btn') || document.getElementById('custom' + toolName.charAt(0).toUpperCase() + toolName.slice(1) + 'Btn');
-            if(currentBtn) currentBtn.classList.remove('active-main');
-        } else {
-            targetGroup.style.display = 'flex';
-            var currentBtn = document.getElementById('main' + toolName.charAt(0).toUpperCase() + toolName.slice(1) + 'Btn') || document.getElementById('custom' + toolName.charAt(0).toUpperCase() + toolName.slice(1) + 'Btn');
-            if(currentBtn) currentBtn.classList.add('active-main');
-        }
-    }
-
-    window.adjustFMB = function(action) {
-        if (!fmbSvgOverlay) return;
-        var zoomFactor = (22 - map.getZoom());
-        var step = 0.000015 * (zoomFactor <= 0 ? 1 : zoomFactor);
-        switch(action) {
-            case 'up': fmbLat += step; break; case 'down': fmbLat -= step; break; case 'left': fmbLng -= step; break; case 'right': fmbLng += step; break;
-            case 'zoomin': fmbWidth *= 1.03; fmbHeight *= 1.03; break; case 'zoomout': fmbWidth *= 0.97; fmbHeight *= 0.97; break;
-            case 'rotL': fmbAngle -= 1.5; break; case 'rotR': fmbAngle += 1.5; break;
-        }
-        renderSVGOverlay();
+  /* ── MODAL (confirm) ────────────────────────────────── */
+  const Modal = (() => {
+    const bd = document.getElementById('modalBackdrop');
+    const title = document.getElementById('modalTitle');
+    const body  = document.getElementById('modalBody');
+    const btnOK = document.getElementById('modalConfirm');
+    const btnCancel = document.getElementById('modalCancel');
+    let _resolve;
+    btnOK.addEventListener('click',     () => { bd.classList.remove('open'); _resolve(true);  });
+    btnCancel.addEventListener('click', () => { bd.classList.remove('open'); _resolve(false); });
+    return {
+      confirm(t, b) {
+        title.textContent = t || 'Confirm'; body.textContent = b || 'Are you sure?';
+        bd.classList.add('open');
+        return new Promise(r => _resolve = r);
+      }
     };
+  })();
 
-    window.removeFMB = function() {
-        if (fmbSvgOverlay) { map.removeLayer(fmbSvgOverlay); fmbSvgOverlay = null; }
-        if (fmbSvgOverlayMini) { miniMap.removeLayer(fmbSvgOverlayMini); fmbSvgOverlayMini = null; }
-        fmbImgDataUrl = ""; document.getElementById('uploadFMB').value = "";
-        document.getElementById('fmbTools').style.display = 'none';
-        if(fmbTouchEditMode) toggleFMBTouch();
+  /* ── AUTO-HIDE CONTROLLER ───────────────────────────── */
+  let uiTimer = null;
+  const showUI = () => {
+    document.body.classList.add('show-ui');
+    clearTimeout(uiTimer);
+    uiTimer = setTimeout(() => {
+      if (!State.drawing && !State.touchMove && !State.eraseMode && !State.editMode)
+        document.body.classList.remove('show-ui');
+    }, 5500);
+  };
+
+  /* ── SHARED STATE (single source of truth) ─────────── */
+  const State = { drawing: false, eraseMode: false, editMode: false, touchMove: false };
+
+  /* ── MAP INIT ───────────────────────────────────────── */
+  const tileSrc = {
+    hybrid: 'https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    road:   'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+    osm:    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  };
+  const googleSubs = { maxZoom:22, subdomains:['mt0','mt1','mt2','mt3'] };
+  const baseLayers = {
+    hybrid: L.tileLayer(tileSrc.hybrid, googleSubs),
+    road:   L.tileLayer(tileSrc.road,   googleSubs),
+    osm:    L.tileLayer(tileSrc.osm,    { maxZoom:22 }),
+  };
+
+  const map = L.map('map', {
+    center:[DEFAULT_VIEW.lat, DEFAULT_VIEW.lng], zoom:DEFAULT_VIEW.zoom,
+    layers:[baseLayers.hybrid], zoomControl:false, tap:false,
+  });
+
+  map.createPane('cadastralPane');
+  Object.assign(map.getPane('cadastralPane').style, { zIndex:'600', pointerEvents:'none' });
+
+  const WMS_BASE = { format:'image/png', transparent:true, maxZoom:22, tileSize:512, zoomOffset:-1, pane:'cadastralPane' };
+  const wmsLayers = {
+    village:   L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, layers:'v3:village',   className:'wms-style-force' }),
+    cadastral: L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, layers:'v3:cadastral' }),
+  };
+  map.addLayer(wmsLayers.village);
+
+  /* ── MINI-MAP (magnifier) ───────────────────────────── */
+  const mini = L.map('zoomBox', {
+    attributionControl:false, zoomControl:false,
+    dragging:false, touchZoom:false, scrollWheelZoom:false, doubleClickZoom:false, boxZoom:false,
+  });
+  L.tileLayer(tileSrc.hybrid, googleSubs).addTo(mini);
+  mini.createPane('miniCadastral');
+  Object.assign(mini.getPane('miniCadastral').style, { zIndex:'600', pointerEvents:'none' });
+
+  const miniWms = {
+    village:   L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'v3:village',   className:'wms-style-force' }),
+    cadastral: L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'v3:cadastral' }),
+  };
+  mini.addLayer(miniWms.village);
+
+  const drawnItems     = new L.FeatureGroup().addTo(map);
+  const drawnItemsMini = new L.FeatureGroup().addTo(mini);
+  const vectorSync     = {};   // mainLayerId → miniLayerId
+
+  /* HUD updates */
+  map.on('zoomend', () => document.getElementById('badgeZoom').textContent = map.getZoom());
+  map.on('dragstart zoomstart', () => {
+    if (!State.drawing && !State.touchMove && !State.eraseMode && !State.editMode)
+      document.body.classList.remove('show-ui');
+  });
+  document.addEventListener('mousemove', showUI);
+  document.addEventListener('touchstart', showUI);
+  document.addEventListener('keydown', showUI);
+
+  /* ════════════════════════════════════════════════════
+     MODULE: LAYERS
+  ════════════════════════════════════════════════════ */
+  const Layers = {
+    _current: 'hybrid',
+    setBase(key) {
+      Object.values(baseLayers).forEach(l => map.removeLayer(l));
+      map.addLayer(baseLayers[key]);
+      this._current = key;
+      document.getElementById('badgeLayer').textContent = key.toUpperCase().slice(0,4);
+      Toast.show(`Switched to <b>${key}</b> layer`, 'info', 2500);
+    },
+    toggleWms(type) {
+      const layer = wmsLayers[type], mLayer = miniWms[type];
+      const btnId = type === 'village' ? 'btnVil' : 'btnCad';
+      const btn   = document.getElementById(btnId);
+      if (map.hasLayer(layer)) {
+        map.removeLayer(layer); mini.removeLayer(mLayer);
+        btn.style.cssText = '';
+        Toast.show(`<b>${type}</b> WMS hidden`, 'info', 2000);
+      } else {
+        map.addLayer(layer); mini.addLayer(mLayer);
+        btn.style.cssText = 'background:var(--amber);color:#000';
+        Toast.show(`<b>${type}</b> WMS active`, 'ok', 2000);
+      }
+    },
+  };
+
+  /* ════════════════════════════════════════════════════
+     MODULE: SEARCH
+  ════════════════════════════════════════════════════ */
+  const Search = (() => {
+    let marker = null;
+    const execute = async () => {
+      const raw = document.getElementById('searchInput').value.trim();
+      if (!raw) return;
+      if (marker) { map.removeLayer(marker); marker = null; }
+
+      const parts = raw.split(/[\s,]+/);
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        const [lat, lng] = parts.map(Number);
+        map.setView([lat, lng], 17);
+        marker = L.marker([lat, lng]).addTo(map).bindPopup(`<b>Coordinates</b><br><code>${lat.toFixed(6)}, ${lng.toFixed(6)}</code>`).openPopup();
+        return;
+      }
+      try {
+        const res  = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(raw)}`);
+        const data = await res.json();
+        if (!data.length) { Toast.show('Place not found', 'warn'); return; }
+        const { lat, lon, display_name } = data[0];
+        map.setView([+lat, +lon], 15);
+        marker = L.marker([+lat, +lon]).addTo(map).bindPopup(`<b>${display_name}</b>`).openPopup();
+      } catch { Toast.show('Search error — check internet', 'error'); }
     };
+    document.getElementById('searchBtn').addEventListener('click', execute);
+    document.getElementById('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') execute(); });
+    return { execute };
+  })();
 
-    document.getElementById('fmbOpacity').addEventListener('input', function(e) {
-        if (fmbSvgOverlay) fmbSvgOverlay.setOpacity(e.target.value);
-        if (fmbSvgOverlayMini) fmbSvgOverlayMini.setOpacity(e.target.value);
+  /* ════════════════════════════════════════════════════
+     MODULE: GPS
+  ════════════════════════════════════════════════════ */
+  const GPS = (() => {
+    let active = false, firstFix = true, userMarker = null, ring = null;
+    const crossIcon = L.divIcon({
+      className:'blue-dot-container',
+      html:'<div class="cross-v"></div><div class="cross-h"></div><div class="blue-dot"></div>',
+      iconSize:[60,60], iconAnchor:[30,30],
     });
-
-    // FMB MULTI-TOUCH EDIT CONTROLLER
-    var fmbTouchEditMode = false;
-    window.toggleFMBTouch = function() {
-        if (map.pm.GlobalDrawMode) map.pm.disableDraw();
-        if (isEditing) toggleEditMode();
-        fmbTouchEditMode = !fmbTouchEditMode;
-        var btn = document.getElementById('touchToggleBtn');
-        if(fmbTouchEditMode) {
-            map.dragging.disable(); map.touchZoom.disable(); map.scrollWheelZoom.disable();
-            btn.classList.add('active-main'); document.body.classList.add('show-ui');
-        } else {
-            map.dragging.enable(); map.touchZoom.enable(); map.scrollWheelZoom.enable();
-            btn.classList.remove('active-main'); showUI();
-        }
+    const toggle = () => {
+      const btn = document.getElementById('gpsBtn');
+      const dot = document.getElementById('gpsDot');
+      if (!active) {
+        firstFix = true; active = true;
+        btn.classList.add('on-blue');
+        dot.classList.add('live');
+        document.getElementById('badgeGps').textContent = '…';
+        map.locate({ setView:false, watch:true, enableHighAccuracy:true });
+        Toast.show('GPS tracking <b>started</b>', 'ok');
+      } else {
+        map.stopLocate();
+        if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+        if (ring)       { map.removeLayer(ring); ring = null; }
+        active = false; btn.classList.remove('on-blue'); dot.classList.remove('live');
+        document.getElementById('badgeGps').textContent = '—';
+        Toast.show('GPS tracking <b>stopped</b>', 'info');
+      }
     };
-
-    var touchStartPos = null, startDist = 0, startCenter = null;
-    var startFmbLat = 0, startFmbLng = 0, startFmbW = 0, startFmbH = 0;
-
-    map.getContainer().addEventListener('touchstart', function(e) {
-        if (!fmbTouchEditMode || !fmbSvgOverlay) return;
-        e.preventDefault();
-        if (e.touches.length === 1) {
-            touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY }; startFmbLat = fmbLat; startFmbLng = fmbLng;
-        } else if (e.touches.length === 2) {
-            var dx = e.touches[0].clientX - e.touches[1].clientX; var dy = e.touches[0].clientY - e.touches[1].clientY;
-            startDist = Math.sqrt(dx*dx + dy*dy);
-            startCenter = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
-            startFmbLat = fmbLat; startFmbLng = fmbLng; startFmbW = fmbWidth; startFmbH = fmbHeight;
-        }
-    }, {passive: false});
-
-    map.getContainer().addEventListener('touchmove', function(e) {
-        if (!fmbTouchEditMode || !fmbSvgOverlay) return; e.preventDefault();
-        if (e.touches.length === 1 && touchStartPos) {
-            var dx = e.touches[0].clientX - touchStartPos.x; var dy = e.touches[0].clientY - touchStartPos.y;
-            var p1 = map.latLngToContainerPoint([startFmbLat, startFmbLng]); p1.x += dx; p1.y += dy;
-            var newLatLng = map.containerPointToLatLng(p1); fmbLat = newLatLng.lat; fmbLng = newLatLng.lng;
-            renderSVGOverlay();
-        } else if (e.touches.length === 2 && startDist > 0) {
-            var dx = e.touches[0].clientX - e.touches[1].clientX; var dy = e.touches[0].clientY - e.touches[1].clientY;
-            var currentDist = Math.sqrt(dx*dx + dy*dy); var scale = currentDist / startDist;
-            fmbWidth = startFmbW * scale; fmbHeight = startFmbH * scale;
-            var currentCenter = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
-            var cdx = currentCenter.x - startCenter.x; var cdy = currentCenter.y - startCenter.y;
-            var p1 = map.latLngToContainerPoint([startFmbLat, startFmbLng]); p1.x += cdx; p1.y += cdy;
-            var newLatLng = map.containerPointToLatLng(p1); fmbLat = newLatLng.lat; fmbLng = newLatLng.lng;
-            renderSVGOverlay();
-        }
-    }, {passive: false});
-
-    map.getContainer().addEventListener('touchend', function(e) { if (!fmbTouchEditMode) return; touchStartPos = null; startDist = 0; }, {passive: false});
-
-    // 4. CROSSHAIR GPS TRACKER
-    var liveUserMarker = null, accuracyCircle = null, isGPS = false;
-    var firstGpsFix = true; 
-    var crossIcon = L.divIcon({ className: 'blue-dot-container', html: '<div class="cross-v"></div><div class="cross-h"></div><div class="blue-dot"></div>', iconSize: [60, 60], iconAnchor: [30, 30] });
-
-    function toggleGpsService() {
-        var btn = document.getElementById('customGpsBtn');
-        if(!isGPS) { firstGpsFix = true; isGPS = true; btn.classList.add('gps-btn-active'); startLocationTracking(); }
-        else { stopLocationTracking(); btn.classList.remove('gps-btn-active'); }
-    }
-    function startLocationTracking() { map.locate({setView: false, watch: true, enableHighAccuracy: true}); }
-    function stopLocationTracking() { map.stopLocate(); if(liveUserMarker) map.removeLayer(liveUserMarker); if(accuracyCircle) map.removeLayer(accuracyCircle); liveUserMarker = null; accuracyCircle = null; isGPS = false; }
-
-    map.on('locationfound', (e) => {
-        if(firstGpsFix) { map.setView(e.latlng, 19); firstGpsFix = false; } else { map.panTo(e.latlng); }
-        if(!liveUserMarker) {
-            liveUserMarker = L.marker(e.latlng, {icon: crossIcon}).addTo(map);
-            accuracyCircle = L.circle(e.latlng, {radius: e.accuracy, color: '#007bff', weight: 1, opacity: 0.3, fillOpacity: 0.05}).addTo(map);
-        } else { liveUserMarker.setLatLng(e.latlng); accuracyCircle.setLatLng(e.latlng).setRadius(e.accuracy); }
+    map.on('locationfound', e => {
+      if (firstFix) { map.setView(e.latlng, 19); firstFix = false; } else { map.panTo(e.latlng); }
+      if (!userMarker) {
+        userMarker = L.marker(e.latlng, { icon:crossIcon }).addTo(map);
+        ring = L.circle(e.latlng, { radius:e.accuracy, color:'#60a5fa', weight:1, opacity:.3, fillOpacity:.04 }).addTo(map);
+      } else { userMarker.setLatLng(e.latlng); ring.setLatLng(e.latlng).setRadius(e.accuracy); }
+      document.getElementById('badgeGps').textContent = `${e.latlng.lat.toFixed(4)},${e.latlng.lng.toFixed(4)}`;
     });
-
-    map.on('locationerror', (e) => {
-        fetch('https://ipapi.co/json/').then(res => res.json()).then(data => {
-            if(data.latitude && data.longitude) {
-                var ipLatLng = L.latLng(data.latitude, data.longitude);
-                if(firstGpsFix) { map.setView(ipLatLng, 16); firstGpsFix = false; } else { map.panTo(ipLatLng); }
-                if(!liveUserMarker) { liveUserMarker = L.marker(ipLatLng, {icon: crossIcon}).addTo(map); } else { liveUserMarker.setLatLng(ipLatLng); }
-                alert("ശ്രദ്ധിക്കുക: ബ്രൗസർ സെക്യൂരിറ്റി കാരണം ഫോണിലെ കൃത്യമായ GPS ലഭ്യമല്ല. ഇപ്പോൾ ഇന്റർനെറ്റ് (IP) വഴിയുള്ള ഏകദേശ ലൊക്കേഷനാണ് കാണിക്കുന്നത്.");
-            }
-        });
+    map.on('locationerror', async () => {
+      try {
+        const d = await (await fetch('https://ipapi.co/json/')).json();
+        if (d.latitude && d.longitude) {
+          const ll = L.latLng(d.latitude, d.longitude);
+          if (firstFix) { map.setView(ll, 16); firstFix = false; } else { map.panTo(ll); }
+          if (!userMarker) userMarker = L.marker(ll, { icon:crossIcon }).addTo(map);
+          else userMarker.setLatLng(ll);
+          Toast.show('ബ്രൗസർ GPS ലഭ്യമല്ല — IP ലൊക്കേഷൻ ഉപയോഗിക്കുന്നു', 'warn', 6000);
+        }
+      } catch { Toast.show('Location unavailable', 'error'); }
     });
+    return { toggle };
+  })();
 
-    // 5. LOCAL STORAGE STORAGE NOTES
-    var pinGroup = L.layerGroup().addTo(map);
-    var savedNotes = JSON.parse(localStorage.getItem('murali_final_v10') || '[]');
-    function renderNotes() {
-        pinGroup.clearLayers();
-        savedNotes.forEach((p, i) => {
-            L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(`<b>Note:</b><br>${p.text}<br><button class="nav-btn" onclick="window.open('http://maps.google.com/?q=${p.lat},${p.lng}')">Navigate</button><button class="del-btn" onclick="deleteNote(${i})">Delete</button>`);
-        });
-    }
-    window.deleteNote = (i) => { savedNotes.splice(i, 1); localStorage.setItem('murali_final_v10', JSON.stringify(savedNotes)); renderNotes(); };
+  /* ════════════════════════════════════════════════════
+     MODULE: DRAW
+  ════════════════════════════════════════════════════ */
+  const Draw = (() => {
+    const savedNotes = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const pinGroup   = L.layerGroup().addTo(map);
+
+    map.pm.addControls({ drawMarker:false, drawPolygon:false, drawPolyline:false, editMode:false, dragMode:false, cutPolygon:false, removalMode:false });
+    map.pm.setGlobalOptions({ snappable:true, snapDistance:25, snapMiddle:true, layerGroup:map });
+
+    const renderNotes = () => {
+      pinGroup.clearLayers();
+      savedNotes.forEach((p, i) => {
+        L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(
+          `<b>📍 Note</b><br>${p.text}
+           <button class="p-nav" onclick="window.open('https://maps.google.com/?q=${p.lat},${p.lng}')"><i class='fa-solid fa-location-arrow'></i> Navigate</button>
+           <button class="p-del" onclick="GIS.Draw._deleteNote(${i})"><i class='fa-solid fa-trash'></i> Delete</button>`
+        );
+      });
+    };
     renderNotes();
 
-    // 6. KML/GEOJSON DATA LOADING
-    document.getElementById('uploadFile').onchange = function(e) {
-        var file = e.target.files[0]; if (!file) return;
-        var reader = new FileReader();
-        reader.onload = function(event) {
-            try {
-                if (file.name.endsWith('.kml')) { var k = omnivore.kml.parse(event.target.result).addTo(map); k.on('ready', () => map.fitBounds(k.getBounds())); }
-                else { var j = L.geoJSON(JSON.parse(event.target.result)).addTo(map); map.fitBounds(j.getBounds()); }
-            } catch(err) { alert("Format Error"); }
-        };
-        reader.readAsText(file);
+    const clearHighlights = () =>
+      ['lineBtn','polygonBtn','markerBtn'].forEach(id => document.getElementById(id)?.classList.remove('on-accent'));
+
+    const trigger = (toolType) => {
+      if (State.editMode)  toggleEdit();
+      if (State.eraseMode) toggleErase();
+      const wasActive = map.pm.GlobalDrawMode === toolType;
+      clearHighlights();
+      if (wasActive) { map.pm.disableDraw(); }
+      else {
+        map.pm.enableDraw(toolType);
+        const id = { Line:'lineBtn', Polygon:'polygonBtn', Marker:'markerBtn' }[toolType];
+        document.getElementById(id)?.classList.add('on-accent');
+      }
     };
 
-    // 7. AUTO-HIDE SYSTEM
-    var uiTimer; 
-    function showUI() { 
-        document.body.classList.add('show-ui'); clearTimeout(uiTimer); 
-        uiTimer = setTimeout(() => { if(!isDrawing && !fmbTouchEditMode && !isEraseMode && !isEditing) document.body.classList.remove('show-ui'); }, 6000); 
-    }
-    map.on('dragstart zoomstart mousedown touchstart', function() { if(!isDrawing && !fmbTouchEditMode && !isEraseMode && !isEditing) { document.body.classList.remove('show-ui'); } });
-    document.addEventListener('mousemove', showUI); document.addEventListener('keydown', showUI); document.addEventListener('touchstart', showUI);
+    map.on('pm:globaldrawmodetoggled', e => { if (!e.enabled) clearHighlights(); });
 
-    function downloadKML() {
-        var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>';
-        drawnItems.eachLayer(l => {
-            kml += '<Placemark><LineString><coordinates>';
-            var c = l.getLatLngs ? (Array.isArray(l.getLatLngs()[0]) ? l.getLatLngs()[0] : l.getLatLngs()) : [l.getLatLng()];
-            c.forEach(p => kml += `${p.lng},${p.lat},0 `);
-            kml += '</coordinates></LineString></Placemark>';
+    map.on('pm:drawstart', () => {
+      State.drawing = true;
+      document.getElementById('zoomBox').style.display = 'block';
+      document.body.classList.add('show-ui');
+    });
+    map.on('pm:drawend', () => {
+      State.drawing = false;
+      document.getElementById('zoomBox').style.display = 'none';
+      showUI();
+    });
+    map.on('mousemove', e => { if (State.drawing) mini.setView(e.latlng, map.getZoom() + 3); });
+
+    map.on('pm:create', e => {
+      const { layer, shape } = e;
+      if (shape === 'Marker') {
+        const ll  = layer.getLatLng();
+        const txt = prompt('Save Note:');
+        if (txt) {
+          savedNotes.push({ lat:ll.lat, lng:ll.lng, text:txt });
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(savedNotes));
+          renderNotes();
+          Toast.show('Note saved', 'ok', 2500);
+        }
+        map.removeLayer(layer); return;
+      }
+      drawnItems.addLayer(layer);
+      if (shape === 'Polygon' || shape === 'Rectangle') {
+        const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+        layer.bindPopup(
+          `<b>Area</b>
+           <p class="area-label">${(area * 0.000247).toFixed(3)} ac · ${(area * 0.0247).toFixed(2)} cents</p>`
+        ).openPopup();
+      }
+      const origId = L.stamp(layer);
+      const style  = { color: layer.options.color || '#3388ff', weight: layer.options.weight || 3 };
+      let miniL;
+      if (shape === 'Line')                              miniL = L.polyline(layer.getLatLngs(), style).addTo(drawnItemsMini);
+      else if (shape === 'Polygon' || shape === 'Rectangle') miniL = L.polygon(layer.getLatLngs(), style).addTo(drawnItemsMini);
+      if (miniL) {
+        vectorSync[origId] = L.stamp(miniL);
+        layer.on('pm:edit', () => {
+          const ml = drawnItemsMini.getLayer(vectorSync[L.stamp(layer)]);
+          if (ml) ml.setLatLngs(layer.getLatLngs());
         });
-        kml += '</Document></kml>';
-        var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([kml])); a.download = "Murali_Traced_Map.kml"; a.click();
-    }
+      }
+    });
+
+    drawnItems.on('layerremove', e => {
+      const oid = L.stamp(e.layer);
+      const ml  = drawnItemsMini.getLayer(vectorSync[oid]);
+      if (ml) drawnItemsMini.removeLayer(ml);
+      delete vectorSync[oid];
+    });
+
+    const toggleErase = () => {
+      if (map.pm.GlobalDrawMode) map.pm.disableDraw();
+      if (State.editMode) toggleEdit();
+      map.pm.toggleGlobalRemovalMode();
+      State.eraseMode = map.pm.globalRemovalModeEnabled();
+      const btn = document.getElementById('eraseModeBtn');
+      if (State.eraseMode) {
+        btn.style.cssText = 'background:var(--amber);color:#000';
+        document.body.classList.add('show-ui');
+        Toast.show('Erase mode <b>ON</b> — tap a shape to delete it. Tap again to exit.', 'warn', 5000);
+      } else { btn.style.cssText = ''; showUI(); }
+    };
+
+    const toggleEdit = () => {
+      if (map.pm.GlobalDrawMode) map.pm.disableDraw();
+      if (State.eraseMode) toggleErase();
+      map.pm.toggleGlobalEditMode();
+      State.editMode = map.pm.globalEditModeEnabled();
+      document.getElementById('editBtn').classList.toggle('on-accent', State.editMode);
+      if (State.editMode) {
+        document.body.classList.add('show-ui');
+        Toast.show('Edit mode <b>ON</b> — drag node handles to reshape. Tap again to exit.', 'info', 5000);
+      } else { showUI(); }
+    };
+
+    const clearAll = async () => {
+      const ok = await Modal.confirm('Clear all drawings?', 'This will remove all lines, polygons and shapes. This cannot be undone.');
+      if (!ok) return;
+      drawnItems.clearLayers(); drawnItemsMini.clearLayers();
+      Object.keys(vectorSync).forEach(k => delete vectorSync[k]);
+      map.eachLayer(l => { if (l.pm && l instanceof L.Path) map.removeLayer(l); });
+      if (State.eraseMode) toggleErase();
+      if (State.editMode)  toggleEdit();
+      Toast.show('All drawings cleared', 'ok');
+    };
+
+    const _deleteNote = i => {
+      savedNotes.splice(i, 1);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(savedNotes));
+      renderNotes();
+      Toast.show('Note deleted', 'ok', 2500);
+    };
+
+    return { trigger, toggleErase, toggleEdit, clearAll, _deleteNote };
+  })();
+
+  /* ════════════════════════════════════════════════════
+     MODULE: FMB (Field Map Book overlay)
+  ════════════════════════════════════════════════════ */
+  const FMB = (() => {
+    let overlay = null, overlayMini = null, imgData = '';
+    let lat = 0, lng = 0, w = 0.0025, h = 0.0025, angle = 0;
+    let touchStart = null, pinchDist = 0, pinchCenter = null;
+    let startLat = 0, startLng = 0, startW = 0, startH = 0;
+
+    document.getElementById('uploadFMB').addEventListener('change', async e => {
+      const file = e.target.files[0]; if (!file) return; e.target.value = '';
+      try {
+        if (file.type === 'application/pdf') {
+          const buf  = await file.arrayBuffer();
+          const pdf  = await pdfjsLib.getDocument(new Uint8Array(buf)).promise;
+          const page = await pdf.getPage(1);
+          const vp   = page.getViewport({ scale:2 });
+          const cvs  = Object.assign(document.createElement('canvas'), { width:vp.width, height:vp.height });
+          await page.render({ canvasContext:cvs.getContext('2d'), viewport:vp }).promise;
+          imgData = cvs.toDataURL('image/png');
+        } else if (file.type.startsWith('image/')) {
+          imgData = await new Promise((res, rej) => {
+            const r = new FileReader();
+            r.onload = ev => res(ev.target.result);
+            r.onerror = rej;
+            r.readAsDataURL(file);
+          });
+        } else { Toast.show('ദയവായി JPG, PNG അല്ലെങ്കിൽ PDF ഫയൽ നൽകുക', 'warn'); return; }
+      } catch (err) { Toast.show(`Load error: ${err.message}`, 'error'); return; }
+
+      const c = map.getCenter();
+      lat = c.lat; lng = c.lng; angle = 0; w = 0.0025; h = 0.0025;
+      render();
+      document.getElementById('fmbTools').style.display = 'flex';
+      Toast.show('FMB loaded — use toolbar to position', 'ok');
+      showUI();
+    });
+
+    const render = () => {
+      if (!imgData) return;
+      const bounds = L.latLngBounds([lat - h/2, lng - w/2], [lat + h/2, lng + w/2]);
+      if (overlay)     map.removeLayer(overlay);
+      if (overlayMini) mini.removeLayer(overlayMini);
+
+      const mkSvg = () => {
+        const ns  = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('xmlns', ns); svg.setAttribute('viewBox', '0 0 100 100');
+        const img = document.createElementNS(ns, 'image');
+        img.setAttribute('width','100'); img.setAttribute('height','100');
+        img.setAttributeNS('http://www.w3.org/1999/xlink','href',imgData);
+        img.setAttribute('href', imgData);
+        img.setAttribute('transform', `rotate(${angle} 50 50)`);
+        svg.appendChild(img); return svg;
+      };
+
+      const op = parseFloat(document.getElementById('fmbOpacity').value);
+      overlay     = L.svgOverlay(mkSvg(), bounds, { pane:'overlayPane', opacity:op, interactive:false }).addTo(map);
+      overlayMini = L.svgOverlay(mkSvg(), bounds, { opacity:op, interactive:false }).addTo(mini);
+    };
+
+    document.getElementById('fmbOpacity').addEventListener('input', e => {
+      overlay?.setOpacity(+e.target.value);
+      overlayMini?.setOpacity(+e.target.value);
+      e.target.style.background = `linear-gradient(to right, var(--accent) ${e.target.value*100}%, var(--surface-3) ${e.target.value*100}%)`;
+    });
+
+    const ACTIONS = {
+      up:      () => { const s = step(); lat += s; },
+      down:    () => { const s = step(); lat -= s; },
+      left:    () => { const s = step(); lng -= s; },
+      right:   () => { const s = step(); lng += s; },
+      zoomin:  () => { w *= 1.03; h *= 1.03; },
+      zoomout: () => { w *= 0.97; h *= 0.97; },
+      rotL:    () => { angle -= 1.5; },
+      rotR:    () => { angle += 1.5; },
+    };
+    const step = () => 0.000015 * Math.max(1, 22 - map.getZoom());
+
+    const adjust = action => { if (!overlay) return; ACTIONS[action]?.(); render(); };
+
+    const remove = async () => {
+      if (!overlay) return;
+      const ok = await Modal.confirm('Remove FMB?', 'This will remove the loaded FMB overlay.');
+      if (!ok) return;
+      overlay && map.removeLayer(overlay); overlay = null;
+      overlayMini && mini.removeLayer(overlayMini); overlayMini = null;
+      imgData = ''; document.getElementById('fmbTools').style.display = 'none';
+      if (State.touchMove) toggleTouch();
+      Toast.show('FMB removed', 'info');
+    };
+
+    const toggleTouch = () => {
+      if (map.pm.GlobalDrawMode) map.pm.disableDraw();
+      State.touchMove = !State.touchMove;
+      const btn = document.getElementById('touchMoveBtn');
+      if (State.touchMove) {
+        map.dragging.disable(); map.touchZoom.disable(); map.scrollWheelZoom.disable();
+        btn.classList.add('on-accent'); document.body.classList.add('show-ui');
+        Toast.show('Touch move <b>ON</b> — drag to move, pinch to scale', 'info', 4000);
+      } else {
+        map.dragging.enable(); map.touchZoom.enable(); map.scrollWheelZoom.enable();
+        btn.classList.remove('on-accent'); showUI();
+      }
+    };
+
+    /* touch handlers */
+    const mc = map.getContainer();
+    mc.addEventListener('touchstart', e => {
+      if (!State.touchMove || !overlay) return; e.preventDefault();
+      if (e.touches.length === 1) {
+        touchStart = { x:e.touches[0].clientX, y:e.touches[0].clientY };
+        startLat = lat; startLng = lng;
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        pinchDist   = Math.hypot(dx, dy);
+        pinchCenter = { x:(e.touches[0].clientX+e.touches[1].clientX)/2, y:(e.touches[0].clientY+e.touches[1].clientY)/2 };
+        startLat = lat; startLng = lng; startW = w; startH = h;
+      }
+    }, { passive:false });
+
+    mc.addEventListener('touchmove', e => {
+      if (!State.touchMove || !overlay) return; e.preventDefault();
+      if (e.touches.length === 1 && touchStart) {
+        const dx = e.touches[0].clientX - touchStart.x;
+        const dy = e.touches[0].clientY - touchStart.y;
+        const p  = map.latLngToContainerPoint([startLat, startLng]);
+        const nl = map.containerPointToLatLng(L.point(p.x+dx, p.y+dy));
+        lat = nl.lat; lng = nl.lng;
+      } else if (e.touches.length === 2 && pinchDist > 0) {
+        const dx  = e.touches[0].clientX - e.touches[1].clientX;
+        const dy  = e.touches[0].clientY - e.touches[1].clientY;
+        const sc  = Math.hypot(dx, dy) / pinchDist;
+        w = startW * sc; h = startH * sc;
+        const cc  = { x:(e.touches[0].clientX+e.touches[1].clientX)/2, y:(e.touches[0].clientY+e.touches[1].clientY)/2 };
+        const p   = map.latLngToContainerPoint([startLat, startLng]);
+        const nl  = map.containerPointToLatLng(L.point(p.x+cc.x-pinchCenter.x, p.y+cc.y-pinchCenter.y));
+        lat = nl.lat; lng = nl.lng;
+      }
+      render();
+    }, { passive:false });
+
+    mc.addEventListener('touchend', () => { touchStart = null; pinchDist = 0; }, { passive:false });
+
+    return { adjust, remove, toggleTouch };
+  })();
+
+  /* ════════════════════════════════════════════════════
+     MODULE: IO (Import / Export)
+  ════════════════════════════════════════════════════ */
+  const IO = (() => {
+    const exportKML = () => {
+      let kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>';
+      drawnItems.eachLayer(l => {
+        kml += '<Placemark><LineString><coordinates>';
+        const pts = l.getLatLngs
+          ? (Array.isArray(l.getLatLngs()[0]) ? l.getLatLngs()[0] : l.getLatLngs())
+          : [l.getLatLng()];
+        pts.forEach(p => { kml += `${p.lng},${p.lat},0 `; });
+        kml += '</coordinates></LineString></Placemark>';
+      });
+      kml += '</Document></kml>';
+      const a = Object.assign(document.createElement('a'), {
+        href:     URL.createObjectURL(new Blob([kml], { type:'application/vnd.google-earth.kml+xml' })),
+        download: 'Murali_Traced_Map.kml',
+      });
+      a.click(); URL.revokeObjectURL(a.href);
+      Toast.show('KML exported', 'ok');
+    };
+
+    document.getElementById('uploadFile').addEventListener('change', e => {
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          if (file.name.endsWith('.kml')) {
+            const k = omnivore.kml.parse(ev.target.result).addTo(map);
+            k.on('ready', () => { map.fitBounds(k.getBounds()); Toast.show('KML loaded', 'ok'); });
+          } else {
+            const j = L.geoJSON(JSON.parse(ev.target.result)).addTo(map);
+            map.fitBounds(j.getBounds());
+            Toast.show('GeoJSON loaded', 'ok');
+          }
+        } catch { Toast.show('Format error — unsupported file', 'error'); }
+      };
+      reader.readAsText(file);
+    });
+
+    return { exportKML };
+  })();
+
+  /* ════════════════════════════════════════════════════
+     MODULE: UI (sub-group expand/collapse)
+  ════════════════════════════════════════════════════ */
+  const UI = {
+    expand(name) {
+      const target = document.getElementById(`group-${name}`);
+      const wasOpen = target.classList.contains('open');
+      TOOL_GROUPS.forEach(g => {
+        document.getElementById(`group-${g}`)?.classList.remove('open');
+        // clear active on parent buttons
+        const ids = [`main${g.charAt(0).toUpperCase()+g.slice(1)}Btn`, `${g}Btn`, `custom${g.charAt(0).toUpperCase()+g.slice(1)}Btn`];
+        ids.forEach(id => document.getElementById(id)?.classList.remove('on-accent'));
+      });
+      if (!wasOpen) {
+        target.classList.add('open');
+        const btnIds = [`main${name.charAt(0).toUpperCase()+name.slice(1)}Btn`, `${name}Btn`];
+        btnIds.forEach(id => document.getElementById(id)?.classList.add('on-accent'));
+      }
+    },
+  };
+
+  /* ════════════════════════════════════════════════════
+     PUBLIC NAMESPACE
+  ════════════════════════════════════════════════════ */
+  window.GIS = { Layers, Search, GPS, Draw, FMB, IO, UI };
+
+  /* ── BOOT ───────────────────────────────────────────── */
+  map.whenReady(() => {
+    const splash = document.getElementById('splash');
+    splash.classList.add('gone');
+    setTimeout(() => splash.remove(), 400);
     showUI();
+  });
+
+})();
 </script>
 </body>
 </html>
-
