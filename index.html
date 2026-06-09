@@ -76,7 +76,7 @@
        LEFT RIBBON TOOLBAR
     ═══════════════════════════════════════════════════ */
     .ribbon {
-      position:absolute; top:175px; left:14px; z-index:2000;
+      position:absolute; top:125px; left:14px; z-index:2000;
       width:var(--ribbon-w);
       display:flex; flex-direction:column; align-items:center; gap:5px;
       background:var(--surface);
@@ -222,7 +222,7 @@
        MAGNIFIER (Small, Beautiful, Circular) - FIXED FOR CANVAS RENDER
     ═══════════════════════════════════════════════════ */
     #zoomBox {
-      position:absolute; top:175px; left:calc(var(--ribbon-w) + 24px);
+      position:absolute; top:125px; left:calc(var(--ribbon-w) + 24px);
       width:100px; height:100px; z-index:3000;
       border:3px solid var(--accent); border-radius:50%;
       background:#000; pointer-events:none; overflow:hidden;
@@ -545,6 +545,7 @@
   /* ── CONSTANTS ──────────────────────────────────────── */
   const STORAGE_KEY   = 'murali_gis_v11';
   const BHUVAN_URL    = 'https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms';
+  const KSREC_URL     = 'https://ksrec.in/geoserver/Kerala/wms';
   const DEFAULT_VIEW  = { lat: 11.196, lng: 76.227, zoom: 16 };
   const TOOL_GROUPS   = ['move','scale','rotate','opacity','layers','erase'];
 
@@ -619,8 +620,8 @@
 
   const WMS_BASE = { format:'image/png', transparent:true, maxZoom:22, tileSize:512, zoomOffset:-1, pane:'cadastralPane' };
   const wmsLayers = {
-    village:   L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, layers:'v3:village',   className:'wms-style-force' }),
-    cadastral: L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, layers:'v3:cadastral' }),
+    village:   L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, layers:'v3:village',    className:'wms-style-force' }),
+    cadastral: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, layers:'Kerala:Cadastry_Kerala' }),
   };
   map.addLayer(wmsLayers.village);
 
@@ -640,8 +641,8 @@
   Object.assign(mini.getPane('miniCadastral').style, { zIndex:'600', pointerEvents:'none' });
 
   const miniWms = {
-    village:   L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'v3:village',   className:'wms-style-force' }),
-    cadastral: L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'v3:cadastral' }),
+    village:   L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'v3:village',    className:'wms-style-force' }),
+    cadastral: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'Kerala:Cadastry_Kerala' }),
   };
   mini.addLayer(miniWms.village);
 
