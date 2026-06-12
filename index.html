@@ -84,11 +84,24 @@
       border-radius:var(--r-lg);
       padding:10px 5px;
       box-shadow:var(--sh-lg);
-      max-height:calc(100vh - 125px - 18px); overflow-y:auto; overflow-x:hidden;
+      max-height:calc(100vh - 125px - 80px); overflow-y:auto; overflow-x:hidden;
       scrollbar-width:none;
       transform:translateX(0);
     }
     .ribbon::-webkit-scrollbar { display:none; }
+    /* Bottom fade — hints there's more content to scroll */
+    .ribbon-wrap {
+      position:absolute; top:125px; left:14px; z-index:2000;
+      width:var(--ribbon-w);
+      max-height:calc(100vh - 125px - 80px);
+      pointer-events:none;
+    }
+    .ribbon-wrap::after {
+      content:''; position:absolute; bottom:0; left:0; right:0; height:28px;
+      background:linear-gradient(transparent, rgba(7,9,14,0.85));
+      border-radius:0 0 var(--r-lg) var(--r-lg);
+      pointer-events:none; z-index:1;
+    }
     .ribbon::after {
       content:''; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
       background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(255,255,255,.008) 3px,rgba(255,255,255,.008) 4px);
@@ -251,6 +264,8 @@
       display:flex; gap:8px; align-items:center;
       background:var(--surface); border:1px solid var(--border);
       border-radius:var(--r-pill); padding:8px 18px; box-shadow:var(--sh-md);
+      padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+      bottom: max(22px, env(safe-area-inset-bottom, 22px));
     }
     .btn {
       display:inline-flex; align-items:center; gap:7px;
