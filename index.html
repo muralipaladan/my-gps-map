@@ -84,7 +84,7 @@
       border-radius:var(--r-lg);
       padding:10px 5px;
       box-shadow:var(--sh-lg);
-      max-height:88vh; overflow-y:auto; overflow-x:hidden;
+      max-height:calc(100vh - 125px - 18px); overflow-y:auto; overflow-x:hidden;
       scrollbar-width:none;
       transform:translateX(0);
     }
@@ -1363,10 +1363,11 @@
       if (State.touchMove) {
         map.dragging.disable(); map.touchZoom.disable(); map.scrollWheelZoom.disable();
         btn.classList.add('on-accent'); document.body.classList.add('show-ui');
-        Toast.show('Touch move <b>ON</b> — drag to move, pinch to scale', 'info', 4000);
+        mc.style.cursor = 'grab';
+        Toast.show('Touch/Mouse move <b>ON</b> — drag to move, pinch/scroll to scale', 'info', 4000);
       } else {
         map.dragging.enable(); map.touchZoom.enable(); map.scrollWheelZoom.enable();
-        btn.classList.remove('on-accent'); showUI();
+        btn.classList.remove('on-accent'); mc.style.cursor = ''; showUI();
       }
     };
 
@@ -1408,6 +1409,49 @@
     }, { passive:false });
 
     mc.addEventListener('touchend', () => { touchStart = null; pinchDist = 0; }, { passive:false });
+
+    /* ── MOUSE DRAG (desktop) ── */
+    let mouseDown = false;
+    let mouseStart = null;
+    let mouseStartLat, mouseStartLng;
+
+    mc.addEventListener('mousedown', e => {
+      if (!State.touchMove || !overlay) return;
+      if (e.button !== 0) return;
+      e.preventDefault();
+      mouseDown = true;
+      mouseStart = { x: e.clientX, y: e.clientY };
+      mouseStartLat = lat; mouseStartLng = lng;
+      mc.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mousemove', e => {
+      if (!mouseDown || !State.touchMove || !overlay) return;
+      e.preventDefault();
+      const dx = e.clientX - mouseStart.x;
+      const dy = e.clientY - mouseStart.y;
+      const p  = map.latLngToContainerPoint([mouseStartLat, mouseStartLng]);
+      const nl = map.containerPointToLatLng(L.point(p.x + dx, p.y + dy));
+      lat = nl.lat; lng = nl.lng;
+      render();
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (!mouseDown) return;
+      mouseDown = false;
+      mouseStart = null;
+      mc.style.cursor = State.touchMove ? 'grab' : '';
+    });
+
+    /* ── SHIFT + SCROLL → FMB ZOOM (desktop) ── */
+    mc.addEventListener('wheel', e => {
+      if (!e.shiftKey || !overlay) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const factor = e.deltaY < 0 ? 1.04 : 0.96;
+      w *= factor; h *= factor;
+      render();
+    }, { passive: false });
 
     return { adjust, remove, toggleTouch };
   })();
@@ -1465,14 +1509,20 @@
       const wasOpen = target.classList.contains('open');
       TOOL_GROUPS.forEach(g => {
         document.getElementById(`group-${g}`)?.classList.remove('open');
-        // clear active on parent buttons
         const ids = [`main${g.charAt(0).toUpperCase()+g.slice(1)}Btn`, `${g}Btn`, `custom${g.charAt(0).toUpperCase()+g.slice(1)}Btn`];
         ids.forEach(id => document.getElementById(id)?.classList.remove('on-accent'));
       });
       if (!wasOpen) {
         target.classList.add('open');
         const btnIds = [`main${name.charAt(0).toUpperCase()+name.slice(1)}Btn`, `${name}Btn`];
-        btnIds.forEach(id => document.getElementById(id)?.classList.add('on-accent'));
+        btnIds.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.classList.add('on-accent');
+            // scroll the button into view inside ribbon
+            setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+          }
+        });
       }
     },
   };
