@@ -61,7 +61,7 @@
     .show-ui .hud { opacity:1; visibility:visible; pointer-events:auto; }
 
     .ribbon {
-      position:absolute; top:125px; left:14px; z-index:2000;
+      position:absolute; top:94px; left:14px; z-index:2000;
       width:var(--ribbon-w);
       display:flex; flex-direction:column; align-items:center; gap:5px;
       background:var(--surface);
@@ -72,6 +72,7 @@
       max-height:88vh; overflow-y:auto; overflow-x:hidden;
       scrollbar-width:none;
       transform:translateX(0);
+      transition: top var(--t2) var(--ease), padding var(--t2) var(--ease), background var(--t2) var(--ease), border-color var(--t2) var(--ease);
     }
     .ribbon::-webkit-scrollbar { display:none; }
     .ribbon::after {
@@ -79,6 +80,31 @@
       background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(255,255,255,.008) 3px,rgba(255,255,255,.008) 4px);
     }
     .rdiv { width:72%; height:1px; background:var(--border); flex-shrink:0; margin:2px 0; }
+
+    /* When ribbon is minimized, hide non-active/expanded elements to give extreme canvas focus */
+    .ribbon.minimized:not(.expanded-touch):not(:hover) > *:not(.on-accent):not(.on-green):not(.on-blue):not(.on-red):not(.sub-group.open):not(#fmbTools) {
+      display: none !important;
+    }
+    .ribbon.minimized:not(.expanded-touch):not(:hover) #fmbTools > *:not(.on-accent):not(.on-green):not(.on-blue):not(.on-red):not(.sub-group.open) {
+      display: none !important;
+    }
+    .ribbon.minimized {
+      padding: 5px;
+      background: rgba(10, 13, 20, 0.55);
+      border-color: rgba(255, 255, 255, 0.05);
+      gap: 4px;
+      box-shadow: var(--sh-sm);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .ribbon.minimized.expanded-touch,
+    .ribbon.minimized:hover {
+      padding: 10px 5px;
+      background: var(--surface);
+      border-color: var(--border);
+      gap: 5px;
+      box-shadow: var(--sh-lg);
+    }
 
     .rb {
       position:relative; width:38px; height:38px; flex-shrink:0;
@@ -145,14 +171,14 @@
     }
 
     .searchbar {
-      position:absolute; top:76px; right:14px; z-index:2000;
+      position:absolute; top:48px; right:14px; z-index:2000;
       display:flex; align-items:center; gap:4px;
-      background:var(--surface); border:1px solid var(--border);
+      background:rgba(10, 13, 20, 0.85); border:1px solid var(--border);
       border-radius:var(--r-md); padding:5px 5px;
       box-shadow:var(--sh-md);
       width: calc(100% - 28px);
       max-width: 320px;
-      transition:border-color var(--t1), box-shadow var(--t1);
+      transition:top var(--t2) var(--ease), border-color var(--t1), box-shadow var(--t1);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
     }
@@ -173,15 +199,16 @@
     .searchbar button:active { transform:scale(.88); }
 
     .hud-badge {
-      position:absolute; top:36px; right:14px; z-index:2000;
+      position:absolute; top:8px; right:14px; z-index:2000;
       width: calc(100% - 28px);
       max-width: 320px;
-      background:var(--surface); border:1px solid var(--border);
+      background:rgba(10, 13, 20, 0.85); border:1px solid var(--border);
       border-radius:var(--r-md); padding:8px 16px;
       font-family:var(--mono); font-size:9.5px; letter-spacing:.4px; color:var(--text-mid);
       box-shadow:var(--sh-sm); display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:12px;
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
+      transition: top var(--t2) var(--ease);
     }
     .badge-col { display:flex; align-items:center; gap:6px; }
     .badge-val { color:var(--text); font-weight:500; }
@@ -194,7 +221,7 @@
     @keyframes dotPulse { 50%{ box-shadow:0 0 0 6px rgba(96,165,250,.1), 0 0 14px var(--blue-light); } }
 
     #zoomBox {
-      position:absolute; top:125px; left:calc(var(--ribbon-w) + 24px);
+      position:absolute; top:94px; left:calc(var(--ribbon-w) + 24px);
       width:100px; height:100px; z-index:3000;
       border:3px solid var(--accent); border-radius:50%;
       background:#000; pointer-events:none; overflow:hidden;
@@ -209,20 +236,23 @@
       content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
       width:14px; height:14px; pointer-events:none; z-index:1;
       background: linear-gradient(rgba(255,255,255,0.75) 1.5px, transparent 1.5px) center/100% 1.5px no-repeat,
-                  linear-gradient(90deg, rgba(255,255,255,0.75) 1.5px, transparent 1.5px) center/1.5px 100% no-repeat;
+      linear-gradient(90deg, rgba(255,255,255,0.75) 1.5px, transparent 1.5px) center/1.5px 100% no-repeat;
     }
 
     .ctrl-panel {
-      position:absolute; bottom:22px; left:50%; transform:translateX(-50%); z-index:2000;
+      position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:2000;
       display:flex; gap:8px; align-items:center;
-      background:var(--surface); border:1px solid var(--border);
-      border-radius:var(--r-pill); padding:8px 18px; box-shadow:var(--sh-md);
+      background:rgba(10, 13, 20, 0.75); border:1px solid rgba(255, 255, 255, 0.08);
+      border-radius:var(--r-pill); padding:6px 14px; box-shadow:var(--sh-lg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: transform var(--t2) var(--spring), opacity var(--t2) var(--ease);
     }
     .btn {
-      display:inline-flex; align-items:center; gap:7px;
+      display:inline-flex; align-items:center; gap:6px;
       border:none; border-radius:var(--r-pill); cursor:pointer;
-      font-family:var(--font); font-size:11.5px; font-weight:700; letter-spacing:.8px; text-transform:uppercase;
-      padding:9px 20px; text-decoration:none;
+      font-family:var(--font); font-size:10.5px; font-weight:700; letter-spacing:.6px; text-transform:uppercase;
+      padding:7px 15px; text-decoration:none;
       transition:filter var(--t1), transform var(--t1) var(--spring), box-shadow var(--t1);
     }
     .btn:hover  { filter:brightness(1.15); box-shadow:0 4px 18px rgba(0,0,0,.4); }
@@ -857,6 +887,7 @@
         const id = { Line:'lineBtn', Polygon:'polygonBtn', Marker:'markerBtn' }[toolType];
         document.getElementById(id)?.classList.add('on-accent');
       }
+      setTimeout(() => UI.syncMinimize(), 50);
     };
 
     map.on('pm:globaldrawmodetoggled', e => { if (!e.enabled) clearHighlights(); });
@@ -1004,6 +1035,7 @@
         document.body.classList.add('show-ui');
         Toast.show('Erase mode <b>ON</b> — tap a shape to delete it. Tap again to exit.', 'warn', 5000);
       } else { btn.style.cssText = ''; showUI(); }
+      setTimeout(() => UI.syncMinimize(), 50);
     };
 
     const toggleEdit = () => {
@@ -1016,6 +1048,7 @@
         document.body.classList.add('show-ui');
         Toast.show('Edit mode <b>ON</b> — drag node handles to reshape. Tap again to exit.', 'info', 5000);
       } else { showUI(); }
+      setTimeout(() => UI.syncMinimize(), 50);
     };
 
     let routeLayerMini = null;
@@ -1053,6 +1086,7 @@
         if (routeLayer)     { map.removeLayer(routeLayer); routeLayer = null; }
         if (routeLayerMini) { mini.removeLayer(routeLayerMini); routeLayerMini = null; }
       }
+      setTimeout(() => UI.syncMinimize(), 50);
     };
 
     const drawShortestRoute = async (destLat, destLng) => {
@@ -1186,6 +1220,7 @@
       imgData = ''; document.getElementById('fmbTools').style.display = 'none';
       if (State.touchMove) toggleTouch();
       Toast.show('FMB removed', 'info');
+      setTimeout(() => UI.syncMinimize(), 50);
     };
 
     const toggleTouch = () => {
@@ -1204,6 +1239,7 @@
         map.scrollWheelZoom.enable();
         btn.classList.remove('on-accent'); showUI();
       }
+      setTimeout(() => UI.syncMinimize(), 50);
     };
 
     const mc = map.getContainer();
@@ -1364,7 +1400,31 @@
         const btnIds = [`main${name.charAt(0).toUpperCase()+name.slice(1)}Btn`, `${name}Btn`];
         btnIds.forEach(id => document.getElementById(id)?.classList.add('on-accent'));
       }
+      this.syncMinimize();
     },
+    syncMinimize() {
+      const ribbon = document.getElementById('ribbon');
+      if (!ribbon) return;
+
+      const hasActiveDraw = !!(map.pm && map.pm.GlobalDrawMode);
+      const hasActiveEdit = !!State.editMode;
+      const hasActiveRoute = !!State.routeMode;
+      const hasActiveErase = !!State.eraseMode;
+      const hasActiveTouchMove = !!State.touchMove;
+
+      const subgroups = Array.from(document.querySelectorAll('.sub-group'));
+      const anySubgroupOpen = subgroups.some(sg => sg.classList.contains('open'));
+
+      const hasHighlightedButton = !!document.querySelector('.rb.on-accent');
+
+      const shouldMinimize = hasActiveDraw || hasActiveEdit || hasActiveRoute || hasActiveErase || hasActiveTouchMove || anySubgroupOpen || hasHighlightedButton;
+
+      if (shouldMinimize) {
+        ribbon.classList.add('minimized');
+      } else {
+        ribbon.classList.remove('minimized');
+      }
+    }
   };
 
   /* ── PUBLIC NAMESPACE ── */
@@ -1376,6 +1436,85 @@
     splash.classList.add('gone');
     setTimeout(() => splash.remove(), 400);
     showUI();
+    UI.syncMinimize();
+    setInterval(() => UI.syncMinimize(), 350);
+
+    // Minimize and touch expand handlers for Ribbon
+    const ribbonElem = document.getElementById('ribbon');
+    if (ribbonElem) {
+      ribbonElem.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+        ribbonElem.classList.add('expanded-touch');
+      }, { passive: true });
+
+      ribbonElem.addEventListener('click', (e) => {
+        e.stopPropagation();
+        ribbonElem.classList.add('expanded-touch');
+      });
+    }
+
+    document.addEventListener('touchstart', (e) => {
+      if (ribbonElem && !ribbonElem.contains(e.target)) {
+        ribbonElem.classList.remove('expanded-touch');
+      }
+    }, { passive: true });
+
+    document.addEventListener('click', (e) => {
+      if (ribbonElem && !ribbonElem.contains(e.target)) {
+        ribbonElem.classList.remove('expanded-touch');
+      }
+    });
+
+    // Native Back Button Event Handler Integration
+    window.onBackPressed = function() {
+      // 1. If any subgroup is open in Ribbon, close it
+      const openSubgroup = document.querySelector('.sub-group.open');
+      if (openSubgroup) {
+        UI.expand(null);
+        return true; // handled
+      }
+
+      // 2. If ribbon is expanded-touch, remove it
+      if (ribbonElem && ribbonElem.classList.contains('expanded-touch')) {
+        ribbonElem.classList.remove('expanded-touch');
+        return true; // handled
+      }
+
+      // 3. If drawing mode is active, disable it and sync ribbon
+      if (map.pm && map.pm.GlobalDrawMode) {
+        map.pm.disableDraw();
+        State.drawing = false;
+        UI.syncMinimize();
+        return true; // handled
+      }
+
+      // 4. If edit mode is active, disable it
+      if (State.editMode) {
+        Draw.toggleEdit();
+        return true; // handled
+      }
+
+      // 5. If erase mode is active, disable it
+      if (State.eraseMode) {
+        Draw.toggleErase();
+        return true; // handled
+      }
+
+      // 6. If route mode is active, disable it
+      if (State.routeMode) {
+        Draw.toggleRouteMode();
+        return true; // handled
+      }
+
+      // 7. If touch move mode for FMB is active, disable it
+      if (State.touchMove) {
+        FMB.toggleTouch();
+        return true; // handled
+      }
+
+      // Default action: let native back button delegate to closing the activity
+      return false;
+    };
   });
 
 })();
