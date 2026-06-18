@@ -44,7 +44,6 @@
       --sh-lg:       0 8px 48px rgba(0,0,0,0.85);
       --ease:        cubic-bezier(.4,0,.2,1);
       --spring:      cubic-bezier(.34,1.56,.64,1);
-      /* ഫേഡ് ആകുന്ന സ്പീഡ് പതുക്കെയാക്കാൻ 700ms, 1000ms ആക്കി കൂട്ടി */
       --t1: 300ms; --t2: 700ms; --t3: 1000ms;
       --font:        'Syne', sans-serif;
       --mono:        'JetBrains Mono', monospace;
@@ -82,11 +81,8 @@
     }
     .rdiv { width:72%; height:1px; background:var(--border); flex-shrink:0; margin:2px 0; }
 
-    /* Ribbon minimized ആയിരിക്കുമ്പോൾ ഉള്ള സ്റ്റൈൽ */
-    .ribbon.minimized:not(.expanded-touch):not(:hover) > *:not(.on-accent):not(.on-green):not(.on-blue):not(.on-red):not(.sub-group.open):not(#fmbTools) {
-      display: none !important;
-    }
-    .ribbon.minimized:not(.expanded-touch):not(:hover) #fmbTools > *:not(.on-accent):not(.on-green):not(.on-blue):not(.on-red):not(.sub-group.open) {
+    /* പുതിയ ഡിഫോൾട്ട് ഘടന നിലനിർത്താൻ റൂളുകൾ മാറ്റിയെഴുതി */
+    .ribbon.minimized:not(.expanded-touch):not(:hover) > *:not(#gpsBtn):not(#drawMainGroupBtn):not(#layerBtn):not(#fmbLoadLabel):not(#fmbTools):not(.sub-group.open) {
       display: none !important;
     }
     .ribbon.minimized {
@@ -97,10 +93,9 @@
       box-shadow: var(--sh-sm);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      opacity: 0.35; /* ഹൈഡ് ആയിരിക്കുമ്പോൾ കൂടുതൽ ഫേഡ് ആകാൻ */
+      opacity: 0.35;
     }
     
-    /* മൗസ് അടുക്കുമ്പോൾ ടാസ്ക്ബാർ തനിയെ പൂർണ്ണമായി തെളിഞ്ഞു വരാൻ (Hover State) */
     .ribbon.minimized.expanded-touch,
     .ribbon.minimized:hover {
       padding: 10px 5px;
@@ -109,9 +104,6 @@
       gap: 5px;
       box-shadow: var(--sh-lg);
       opacity: 1 !important;
-    }
-    .ribbon.minimized:hover > *, .ribbon.minimized:hover #fmbTools > * {
-      display: flex !important; /* മൗസ് വെക്കുമ്പോൾ ഒളിച്ചുവെച്ച ടൂളുകൾ തിരികെ കാണിക്കാൻ */
     }
 
     .rb {
@@ -409,23 +401,28 @@
 </div>
 
 <div class="ribbon" id="ribbon">
+  <!-- 1. LIVE GPS -->
   <button class="rb" id="gpsBtn" data-tip="Live GPS" onclick="GIS.GPS.toggle()"><i class="fa-solid fa-crosshairs"></i></button>
-  <button class="rb" id="routeModeBtn" data-tip="Route Planner" onclick="GIS.Draw.toggleRouteMode()"><i class="fa-solid fa-route"></i></button>
+  
   <div class="rdiv"></div>
 
-  <button class="rb" id="lineBtn"    data-tip="Draw Line"    onclick="GIS.Draw.trigger('Line')">   <i class="fa-solid fa-file-signature"></i></button>
-  <button class="rb" id="polygonBtn" data-tip="Draw Polygon" onclick="GIS.Draw.trigger('Polygon')"><i class="fa-solid fa-draw-polygon"></i></button>
-  <button class="rb" id="markerBtn"  data-tip="Save Note"    onclick="GIS.Draw.trigger('Marker')"> <i class="fa-solid fa-location-dot"></i></button>
-  <button class="rb" id="editBtn"    data-tip="Edit Shapes"  onclick="GIS.Draw.toggleEdit()"><i class="fa-solid fa-pen-to-square"></i></button>
-
-  <button class="rb" id="eraseBtn" data-tip="Erase Tools" onclick="GIS.UI.expand('erase')"><i class="fa-solid fa-eraser"></i></button>
-  <div class="sub-group" id="group-erase">
-    <button class="mb" id="eraseModeBtn" title="Touch Erase" onclick="GIS.Draw.toggleErase()"><i class="fa-solid fa-hand-pointer"></i></button>
+  <!-- 2. DRAWING TOOL MAIN TAB -->
+  <button class="rb" id="drawMainGroupBtn" data-tip="Drawing Tools" onclick="GIS.UI.expand('drawGroup')"><i class="fa-solid fa-pen-ruler"></i></button>
+  
+  <!-- Drawing Tools സബ്‌ഗ്രൂപ്പ് (ഇതിൽ നോട്ട് പിൻ, ലൈൻ, പോളിഗൺ എല്ലാം ഉൾപ്പെടുത്തി) -->
+  <div class="sub-group" id="group-drawGroup">
+    <button class="mb" id="markerBtn"  title="Save Note (Location Pin)" onclick="GIS.Draw.trigger('Marker')"> <i class="fa-solid fa-location-dot"></i></button>
+    <button class="mb" id="lineBtn"    title="Draw Line"    onclick="GIS.Draw.trigger('Line')">   <i class="fa-solid fa-file-signature"></i></button>
+    <button class="mb" id="polygonBtn" title="Draw Polygon" onclick="GIS.Draw.trigger('Polygon')"><i class="fa-solid fa-draw-polygon"></i></button>
+    <button class="mb" id="routeModeBtn" title="Route Planner" onclick="GIS.Draw.toggleRouteMode()"><i class="fa-solid fa-route"></i></button>
+    <button class="mb" id="editBtn"    title="Edit Shapes"  onclick="GIS.Draw.toggleEdit()"><i class="fa-solid fa-pen-to-square"></i></button>
+    <button class="mb" id="eraseModeBtn" title="Touch Erase" onclick="GIS.Draw.toggleErase()"><i class="fa-solid fa-eraser"></i></button>
     <button class="mb" title="Clear All"  onclick="GIS.Draw.clearAll()"  style="color:var(--red)"><i class="fa-solid fa-trash-can"></i></button>
   </div>
 
   <div class="rdiv"></div>
 
+  <!-- 3. LAYER TAB -->
   <button class="rb" id="layerBtn" data-tip="Layers" onclick="GIS.UI.expand('layers')"><i class="fa-solid fa-layer-group"></i></button>
   <div class="sub-group" id="group-layers">
     <button class="mb" title="Hybrid"       onclick="GIS.Layers.setBase('hybrid')" style="font-size:9px;font-weight:800;letter-spacing:.5px">HYB</button>
@@ -438,11 +435,13 @@
 
   <div class="rdiv"></div>
 
-  <label class="rb on-green" data-tip="Load FMB" title="Load FMB Image/PDF">
+  <!-- 4. FMB UPLOAD BUTTON (Default ആയി ഇത് മാത്രമേ കാണൂ) -->
+  <label class="rb on-green" id="fmbLoadLabel" data-tip="Load FMB" title="Load FMB Image/PDF">
     <i class="fa-solid fa-image"></i>
     <input type="file" id="uploadFMB" accept=".jpg,.jpeg,.png,.pdf" style="display:none" />
   </label>
 
+  <!-- FMB അപ്‌ലോഡ് ആയിക്കഴിഞ്ഞാൽ മാത്രം കാണേണ്ട ബാക്കി എല്ലാ ടൂളുകളും (Move, Scale, Rotate, Opacity) -->
   <div id="fmbTools" style="display:none;flex-direction:column;align-items:center;gap:5px;width:100%">
     <div class="rdiv"></div>
     <button class="rb" id="touchMoveBtn" data-tip="Touch Move" onclick="GIS.FMB.toggleTouch()"><i class="fa-solid fa-hand-pointer"></i></button>
@@ -522,7 +521,7 @@
   const BHUVAN_URL    = 'https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms';
   const KSREC_URL     = 'https://ksrec.in/geoserver/Kerala/wms';
   const DEFAULT_VIEW  = { lat: 11.196, lng: 76.227, zoom: 16 };
-  const TOOL_GROUPS   = ['move','scale','rotate','opacity','layers','erase'];
+  const TOOL_GROUPS   = ['drawGroup','move','scale','rotate','opacity','layers','erase'];
 
   /* ── TOAST ── */
   const Toast = (() => {
@@ -608,7 +607,6 @@
     cadastral: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, layers:'Kerala:Cadastry_Kerala' }),
   };
   
-  // ഡിഫോൾട്ട് ആയി സിസ്റ്റം വഴി തന്നെ CAD ലെയർ മാപ്പിൽ ലോഡ് ചെയ്യുന്നു
   map.addLayer(wmsLayers.cadastral);
 
   /* ── MINI MAP ── */
@@ -631,7 +629,6 @@
     cadastral: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'Kerala:Cadastry_Kerala' }),
   };
   
-  // മിനി മാപ്പിലും ഡിഫോൾട്ട് ആയി CAD ലെയർ ആഡ് ചെയ്തു
   mini.addLayer(miniWms.cadastral);
 
   const drawnItems     = new L.FeatureGroup().addTo(map);
@@ -884,18 +881,24 @@
     renderNotes();
 
     const clearHighlights = () =>
-      ['lineBtn','polygonBtn','markerBtn'].forEach(id => document.getElementById(id)?.classList.remove('on-accent'));
+      ['lineBtn','polygonBtn','markerBtn'].forEach(id => {
+        document.getElementById(id)?.classList.remove('on-accent');
+      });
 
     const trigger = (toolType) => {
       if (State.editMode)  toggleEdit();
       if (State.eraseMode) toggleErase();
       const wasActive = map.pm.GlobalDrawMode === toolType;
       clearHighlights();
+      // മുൻപ് സബ്‌ബട്ടണുകളിൽ ഉണ്ടായിരുന്ന സ്റ്റൈൽ റീസെറ്റ് ചെയ്യാൻ
+      document.querySelectorAll('#group-drawGroup .mb').forEach(b => b.style.cssText = '');
+      
       if (wasActive) { map.pm.disableDraw(); }
       else {
         map.pm.enableDraw(toolType, { hintMarkerStyle: { opacity: 0, fillOpacity: 0 } });
         const id = { Line:'lineBtn', Polygon:'polygonBtn', Marker:'markerBtn' }[toolType];
-        document.getElementById(id)?.classList.add('on-accent');
+        // ടാപ്പ് ചെയ്യുന്ന സബ്‌ബട്ടൺ ആക്റ്റീവ് കളർ ആക്കാൻ
+        document.getElementById(id).style.cssText = 'background:var(--accent);color:#fff';
       }
       setTimeout(() => UI.syncMinimize(), 50);
     };
@@ -957,7 +960,9 @@
           renderNotes();
           Toast.show('Note saved', 'ok', 2500);
         }
-        map.removeLayer(layer); return;
+        map.removeLayer(layer); 
+        document.getElementById('markerBtn').style.cssText = '';
+        return;
       }
 
       drawnItems.addLayer(layer);
@@ -1025,6 +1030,10 @@
           if (ml) ml.setLatLngs(layer.getLatLngs());
         });
       }
+      
+      // ഡ്രോയിങ് കംപ്ലീറ്റ് ആയാൽ സബ്‌ബട്ടൺ നോർമൽ ആക്കാൻ
+      document.getElementById('lineBtn').style.cssText = '';
+      document.getElementById('polygonBtn').style.cssText = '';
     });
 
     drawnItems.on('layerremove', e => {
@@ -1041,9 +1050,9 @@
       State.eraseMode = map.pm.globalRemovalModeEnabled();
       const btn = document.getElementById('eraseModeBtn');
       if (State.eraseMode) {
-        btn.style.cssText = 'background:var(--amber);color:#000';
+        btn.style.cssText = 'background:var(--accent);color:#fff';
         document.body.classList.add('show-ui');
-        Toast.show('Erase mode <b>ON</b> — tap a shape to delete it. Tap again to exit.', 'warn', 5000);
+        Toast.show('Erase mode <b>ON</b> — tap a shape to delete it.', 'warn', 4000);
       } else { btn.style.cssText = ''; showUI(); }
       setTimeout(() => UI.syncMinimize(), 50);
     };
@@ -1053,11 +1062,12 @@
       if (State.eraseMode) toggleErase();
       map.pm.toggleGlobalEditMode();
       State.editMode = map.pm.globalEditModeEnabled();
-      document.getElementById('editBtn').classList.toggle('on-accent', State.editMode);
+      const btn = document.getElementById('editBtn');
       if (State.editMode) {
+        btn.style.cssText = 'background:var(--accent);color:#fff';
         document.body.classList.add('show-ui');
-        Toast.show('Edit mode <b>ON</b> — drag node handles to reshape. Tap again to exit.', 'info', 5000);
-      } else { showUI(); }
+        Toast.show('Edit mode <b>ON</b> — drag node handles to reshape.', 'info', 4000);
+      } else { btn.style.cssText = ''; showUI(); }
       setTimeout(() => UI.syncMinimize(), 50);
     };
 
@@ -1089,10 +1099,10 @@
       State.routeMode = !State.routeMode;
       const btn = document.getElementById('routeModeBtn');
       if (State.routeMode) {
-        btn.classList.add('on-accent');
-        Toast.show('Route Planner <b>ACTIVE</b> — Tap anywhere on the map to find the shortest routing line.', 'info', 5000);
+        btn.style.cssText = 'background:var(--accent);color:#fff';
+        Toast.show('Route Planner <b>ACTIVE</b> — Tap anywhere on the map.', 'info', 4000);
       } else {
-        btn.classList.remove('on-accent');
+        btn.style.cssText = '';
         if (routeLayer)     { map.removeLayer(routeLayer); routeLayer = null; }
         if (routeLayerMini) { mini.removeLayer(routeLayerMini); routeLayerMini = null; }
       }
@@ -1174,6 +1184,8 @@
       const c = map.getCenter();
       lat = c.lat; lng = c.lng; angle = 0; w = 0.0025; h = 0.0025;
       render();
+      
+      // ഫയൽ അപ്‌ലോഡ് ആയിക്കഴിഞ്ഞാൽ ബാക്കി എല്ലാ ടൂളുകളും ദൃശ്യമാക്കുന്നു
       document.getElementById('fmbTools').style.display = 'flex';
       Toast.show('FMB loaded — use toolbar to position', 'ok');
       showUI();
@@ -1227,7 +1239,10 @@
       if (!ok) return;
       overlay && map.removeLayer(overlay); overlay = null;
       overlayMini && mini.removeLayer(overlayMini); overlayMini = null;
-      imgData = ''; document.getElementById('fmbTools').style.display = 'none';
+      imgData = ''; 
+      
+      // FMB റിമൂവ് ചെയ്താൽ ടൂളുകൾ വീണ്ടും ഒളിപ്പിക്കുന്നു
+      document.getElementById('fmbTools').style.display = 'none';
       if (State.touchMove) toggleTouch();
       Toast.show('FMB removed', 'info');
       setTimeout(() => UI.syncMinimize(), 50);
@@ -1432,16 +1447,16 @@
   const UI = {
     expand(name) {
       const target = document.getElementById(`group-${name}`);
-      const wasOpen = target.classList.contains('open');
+      const wasOpen = target?.classList.contains('open');
       TOOL_GROUPS.forEach(g => {
         document.getElementById(`group-${g}`)?.classList.remove('open');
-        const ids = [`main${g.charAt(0).toUpperCase()+g.slice(1)}Btn`, `${g}Btn`];
+        const ids = [`main${g.charAt(0).toUpperCase()+g.slice(1)}Btn`, `${g}Btn`, 'drawMainGroupBtn'];
         ids.forEach(id => document.getElementById(id)?.classList.remove('on-accent'));
       });
-      if (!wasOpen) {
+      if (target && !wasOpen) {
         target.classList.add('open');
-        const btnIds = [`main${name.charAt(0).toUpperCase()+name.slice(1)}Btn`, `${name}Btn`];
-        btnIds.forEach(id => document.getElementById(id)?.classList.add('on-accent'));
+        const mainBtnId = name === 'drawGroup' ? 'drawMainGroupBtn' : `${name}Btn`;
+        document.getElementById(mainBtnId)?.classList.add('on-accent');
       }
       this.syncMinimize();
     },
@@ -1449,7 +1464,6 @@
       const ribbon = document.getElementById('ribbon');
       if (!ribbon) return;
 
-      // ടാസ്ക്ബാറിന് മുകളിൽ മൗസ് ഉണ്ടെങ്കിൽ (Hovering) യാതൊരു കാരണവശാലും അത് minimize ആകരുത്
       if (ribbon.matches(':hover') || ribbon.classList.contains('expanded-touch')) {
         ribbon.classList.remove('minimized');
         return;
@@ -1477,7 +1491,7 @@
   };
 
   /* ── PUBLIC NAMESPACE ── */
-  window.GIS = { Layers, Search, GPS, Draw, FMB, IO, UI };
+  window.GIS = { Layers, Search, GPS, Draw, FMB, UI, IO };
 
   /* ── BOOT ── */
   map.whenReady(() => {
@@ -1486,7 +1500,6 @@
     setTimeout(() => splash.remove(), 400);
     showUI();
     
-    // മാപ്പ് റെഡി ആകുമ്പോൾ തന്നെ സിസ്റ്റം ലെയർ ബാഡ്ജ് "CAD" എന്ന് അപ്ഡേറ്റ് ചെയ്യാനും ജി.ഐ.എസ് ട്രാക്കിങ് കൃത്യമാക്കാനും
     document.getElementById('badgeLayer').textContent = 'CAD';
     
     UI.syncMinimize();
@@ -1504,7 +1517,6 @@
         ribbonElem.classList.add('expanded-touch');
       });
       
-      // മൗസ് ടാസ്ക്ബാറിലേക്ക് അടുക്കുമ്പോൾ ഉടൻ തന്നെ തിരികെ മിനിമൈസ്ഡ് മോഡ് മാറ്റാൻ
       ribbonElem.addEventListener('mouseenter', () => {
         ribbonElem.classList.remove('minimized');
       });
@@ -1522,7 +1534,6 @@
       }
     });
 
-    // Native Back Button Event Handler Integration
     window.onBackPressed = function() {
       const openSubgroup = document.querySelector('.sub-group.open');
       if (openSubgroup) {
