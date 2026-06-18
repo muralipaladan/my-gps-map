@@ -81,7 +81,6 @@
     }
     .rdiv { width:72%; height:1px; background:var(--border); flex-shrink:0; margin:2px 0; }
 
-    /* പുതിയ ഡിഫോൾട്ട് ഘടന നിലനിർത്താൻ റൂളുകൾ മാറ്റിയെഴുതി */
     .ribbon.minimized:not(.expanded-touch):not(:hover) > *:not(#gpsBtn):not(#drawMainGroupBtn):not(#layerBtn):not(#fmbLoadLabel):not(#fmbTools):not(.sub-group.open) {
       display: none !important;
     }
@@ -170,8 +169,9 @@
       box-shadow:0 0 6px var(--accent-glow); cursor:pointer;
     }
 
+    /* Search Bar ബാഡ്ജ് ഇരുന്ന മുകൾ ഭാഗത്തേക്ക് (top: 8px) ഷിഫ്റ്റ് ചെയ്തു */
     .searchbar {
-      position:absolute; top:48px; right:14px; z-index:2000;
+      position:absolute; top:8px; right:14px; z-index:2000;
       display:flex; align-items:center; gap:4px;
       background:rgba(10, 13, 20, 0.85); border:1px solid var(--border);
       border-radius:var(--r-md); padding:5px 5px;
@@ -197,47 +197,6 @@
     }
     .searchbar button:hover  { background:var(--accent-hi); }
     .searchbar button:active { transform:scale(.88); }
-
-    .hud-badge {
-      position:absolute; top:8px; right:14px; z-index:2000;
-      width: calc(100% - 28px);
-      max-width: 320px;
-      background:rgba(10, 13, 20, 0.85); border:1px solid var(--border);
-      border-radius:var(--r-md); padding:8px 16px;
-      font-family:var(--mono); font-size:9.5px; letter-spacing:.4px; color:var(--text-mid);
-      box-shadow:var(--sh-sm); display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:12px;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      transition: top var(--t2) var(--ease);
-    }
-    .badge-col { display:flex; align-items:center; gap:6px; }
-    .badge-val { color:var(--text); font-weight:500; }
-    .gps-dot {
-      display:inline-block; width:7px; height:7px; border-radius:50%;
-      background:var(--text-dim); margin-right:5px; vertical-align:middle;
-      transition:background var(--t2), box-shadow var(--t2);
-    }
-    .gps-dot.live { background:var(--blue-light); box-shadow:0 0 0 3px rgba(96,165,250,.25), 0 0 8px var(--blue-light); animation:dotPulse 2s ease-in-out infinite; }
-    @keyframes dotPulse { 50%{ box-shadow:0 0 0 6px rgba(96,165,250,.1), 0 0 14px var(--blue-light); } }
-
-    #zoomBox {
-      position:absolute; top:94px; left:calc(var(--ribbon-w) + 24px);
-      width:100px; height:100px; z-index:3000;
-      border:3px solid var(--accent); border-radius:50%;
-      background:#000; pointer-events:none; overflow:hidden;
-      box-shadow:var(--sh-md), 0 0 15px var(--accent-glow);
-      opacity: 0; visibility: hidden; transform: scale(0.9);
-      transition: opacity var(--t1) var(--ease), transform var(--t1) var(--ease), visibility var(--t1);
-    }
-    #zoomBox.active {
-      opacity: 1; visibility: visible; transform: scale(1);
-    }
-    #zoomBox::before {
-      content:''; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
-      width:14px; height:14px; pointer-events:none; z-index:1;
-      background: linear-gradient(rgba(255,255,255,0.75) 1.5px, transparent 1.5px) center/100% 1.5px no-repeat,
-      linear-gradient(90deg, rgba(255,255,255,0.75) 1.5px, transparent 1.5px) center/1.5px 100% no-repeat;
-    }
 
     .ctrl-panel {
       position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:2000;
@@ -375,6 +334,7 @@
 <div id="map"></div>
 <div id="zoomBox"></div>
 
+<!-- Search bar ഇപ്പോൾ ടോപ്പിലേക്ക് (top: 8px) കൃത്യമായി ക്രമീകരിച്ചു -->
 <div class="searchbar" id="searchBar">
   <input type="text" id="searchInput" placeholder="Search place or lat, lng…" autocomplete="off" />
   <span style="display:flex;align-items:center;gap:5px;flex-shrink:0;padding:0 4px;border-left:1px solid var(--border);margin-left:2px;">
@@ -385,20 +345,7 @@
   <button id="searchBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
 </div>
 
-<div class="hud-badge" id="hudBadge">
-  <div class="badge-col">
-    <span><span class="gps-dot" id="gpsDot"></span>GPS:</span>
-    <span class="badge-val" id="badgeGps">—</span>
-  </div>
-  <div class="badge-col">
-    <span>ZOOM:</span>
-    <span class="badge-val" id="badgeZoom">16</span>
-  </div>
-  <div class="badge-col">
-    <span>LAYER:</span>
-    <span class="badge-val" id="badgeLayer">HYB</span>
-  </div>
-</div>
+<!-- ഹഡ് ബാഡ്ജ് (HUD Badge Ribbon) റിമൂവ് ചെയ്തു -->
 
 <div class="ribbon" id="ribbon">
   <!-- 1. LIVE GPS -->
@@ -409,7 +356,6 @@
   <!-- 2. DRAWING TOOL MAIN TAB -->
   <button class="rb" id="drawMainGroupBtn" data-tip="Drawing Tools" onclick="GIS.UI.expand('drawGroup')"><i class="fa-solid fa-pen-ruler"></i></button>
   
-  <!-- Drawing Tools സബ്‌ഗ്രൂപ്പ് (ഇതിൽ നോട്ട് പിൻ, ലൈൻ, പോളിഗൺ എല്ലാം ഉൾപ്പെടുത്തി) -->
   <div class="sub-group" id="group-drawGroup">
     <button class="mb" id="markerBtn"  title="Save Note (Location Pin)" onclick="GIS.Draw.trigger('Marker')"> <i class="fa-solid fa-location-dot"></i></button>
     <button class="mb" id="lineBtn"    title="Draw Line"    onclick="GIS.Draw.trigger('Line')">   <i class="fa-solid fa-file-signature"></i></button>
@@ -435,13 +381,12 @@
 
   <div class="rdiv"></div>
 
-  <!-- 4. FMB UPLOAD BUTTON (Default ആയി ഇത് മാത്രമേ കാണൂ) -->
+  <!-- 4. FMB UPLOAD BUTTON -->
   <label class="rb on-green" id="fmbLoadLabel" data-tip="Load FMB" title="Load FMB Image/PDF">
     <i class="fa-solid fa-image"></i>
     <input type="file" id="uploadFMB" accept=".jpg,.jpeg,.png,.pdf" style="display:none" />
   </label>
 
-  <!-- FMB അപ്‌ലോഡ് ആയിക്കഴിഞ്ഞാൽ മാത്രം കാണേണ്ട ബാക്കി എല്ലാ ടൂളുകളും (Move, Scale, Rotate, Opacity) -->
   <div id="fmbTools" style="display:none;flex-direction:column;align-items:center;gap:5px;width:100%">
     <div class="rdiv"></div>
     <button class="rb" id="touchMoveBtn" data-tip="Touch Move" onclick="GIS.FMB.toggleTouch()"><i class="fa-solid fa-hand-pointer"></i></button>
@@ -681,7 +626,6 @@
   });
   mapContainer.addEventListener('mouseup', () => { hideMagnifier(); });
 
-  map.on('zoomend', () => document.getElementById('badgeZoom').textContent = map.getZoom());
   map.on('click', e => {
     if (State.routeMode) { Draw.drawShortestRoute(e.latlng.lat, e.latlng.lng); }
     if (State.drawing)   { mini.setView(e.latlng, map.getZoom() + 4); }
@@ -705,7 +649,6 @@
       Object.values(baseLayersMini).forEach(l => mini.removeLayer(l));
       mini.addLayer(baseLayersMini[key]);
       this._current = key;
-      document.getElementById('badgeLayer').textContent = key.toUpperCase().slice(0,4);
       Toast.show(`Switched to <b>${key}</b> layer`, 'info', 2500);
     },
     toggleWms(type) {
@@ -756,20 +699,33 @@
     return { execute };
   })();
 
-  /* ── MODULE: GPS ── */
+  /* ════════════════════════════════════
+     ADVANCED HIGH-ACCURACY GPS ENGINE
+  ════════════════════════════════════ */
   const GPS = (() => {
-    let active = false, firstFix = true, userMarker = null, ring = null;
+    let active = false;
+    let watchId = null;
+    let userMarker = null, ring = null;
     let userMarkerMini = null, ringMini = null;
+    
     const crossIcon = L.divIcon({
       className:'blue-dot-container',
       html:'<div class="cross-v"></div><div class="cross-h"></div><div class="blue-dot"></div>',
       iconSize:[60,60], iconAnchor:[30,30],
     });
 
-    const onLocationSuccess = (lat, lng, accuracy) => {
+    // ലൊക്കേഷൻ ലഭിക്കുമ്പോൾ എക്സിക്യൂട്ട് ചെയ്യുന്ന ഫങ്ക്ഷൻ (High Accuracy)
+    const onLocationUpdate = (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      const accuracy = position.coords.accuracy;
       const latlng = L.latLng(lat, lng);
+      
       State.userLatLng = latlng;
-      if (firstFix) { map.setView(latlng, 19); firstFix = false; } else { map.panTo(latlng); }
+      
+      // ലൊക്കേഷൻ മാറിയാൽ സ്മൂത്ത് ആയി പാൻ ചെയ്യും
+      map.panTo(latlng);
+
       if (!userMarker) {
         userMarker = L.marker(latlng, { icon:crossIcon }).addTo(map);
         ring = L.circle(latlng, { radius:accuracy, color:'#60a5fa', weight:1, opacity:.3, fillOpacity:.04 }).addTo(map);
@@ -777,6 +733,7 @@
         userMarker.setLatLng(latlng);
         ring.setLatLng(latlng).setRadius(accuracy);
       }
+
       if (!userMarkerMini) {
         userMarkerMini = L.marker(latlng, { icon:crossIcon }).addTo(mini);
         ringMini = L.circle(latlng, { radius:accuracy, color:'#60a5fa', weight:1, opacity:.3, fillOpacity:.04 }).addTo(mini);
@@ -784,67 +741,66 @@
         userMarkerMini.setLatLng(latlng);
         ringMini.setLatLng(latlng).setRadius(accuracy);
       }
-      document.getElementById('badgeGps').textContent = `${lat.toFixed(4)},${lng.toFixed(4)}`;
     };
 
-    const onLocationFailure = (msg) => {
-      console.warn("GPS tracking status/failure:", msg);
-      fetchFallbackIP();
-    };
-
-    const fetchFallbackIP = async () => {
-      try {
-        const d = await (await fetch('https://ipapi.co/json/')).json();
-        if (d.latitude && d.longitude) {
-          const ll = L.latLng(d.latitude, d.longitude);
-          State.userLatLng = ll;
-          if (firstFix) { map.setView(ll, 16); firstFix = false; } else { map.panTo(ll); }
-          if (!userMarker) userMarker = L.marker(ll, { icon:crossIcon }).addTo(map);
-          else userMarker.setLatLng(ll);
-          if (!userMarkerMini) userMarkerMini = L.marker(ll, { icon:crossIcon }).addTo(mini);
-          else userMarkerMini.setLatLng(ll);
-          Toast.show('ബ്രൗസർ GPS ലഭ്യമല്ല — IP ലൊക്കേഷൻ ഉപയോഗിക്കുന്നു', 'warn', 6000);
-        }
-      } catch {
-        Toast.show('Location unavailable', 'error');
+    const onLocationError = (error) => {
+      console.warn("GPS Tracking Error/Fallback Code:", error.message);
+      // Timeout അല്ലെങ്കിൽ സിഗ്നൽ ലോസ് വന്നാൽ വീണ്ടും കണക്ട് ചെയ്യാൻ ശ്രമിക്കും
+      if (active && error.code === error.TIMEOUT) {
+        restartTracking();
+      } else if (error.code === error.PERMISSION_DENIED) {
+        Toast.show('ലൊക്കേഷൻ പെർമിഷൻ നിരസിക്കപ്പെട്ടു.', 'error');
+        stop();
       }
+    };
+
+    const start = () => {
+      if (navigator.geolocation) {
+        // പരമാവധി ആക്യുറേറ്റ് ലൊക്കേഷൻ ലൈവ് ആയി ട്രാക്ക് ചെയ്യാനുള്ള അഡ്വാൻസ്ഡ് കോൺഫിഗറേഷൻ
+        const gpsOptions = {
+          enableHighAccuracy: true, // ഹാർഡ്‌വെയർ ജിപിഎസ് നിർബന്ധമാക്കുന്നു
+          timeout: 10000,           // 10 സെക്കൻഡിൽ റെസ്പോൺസ് വരണം
+          maximumAge: 0             // പഴയ കാഷെ ഡാറ്റ പൂർണ്ണമായി ഒഴിവാക്കുന്നു
+        };
+        watchId = navigator.geolocation.watchPosition(onLocationUpdate, onLocationError, gpsOptions);
+      } else {
+        Toast.show('നിങ്ങളുടെ ഉപകരണത്തിൽ GPS ലഭ്യമല്ല.', 'error');
+      }
+    };
+
+    const stop = () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      if (userMarker)     { map.removeLayer(userMarker); userMarker = null; }
+      if (ring)           { map.removeLayer(ring); ring = null; }
+      if (userMarkerMini) { mini.removeLayer(userMarkerMini); userMarkerMini = null; }
+      if (ringMini)       { mini.removeLayer(ringMini); ringMini = null; }
+    };
+
+    const restartTracking = () => {
+      if (!active) return;
+      navigator.geolocation.clearWatch(watchId);
+      start();
     };
 
     const toggle = () => {
       const btn = document.getElementById('gpsBtn');
-      const dot = document.getElementById('gpsDot');
       if (!active) {
-        firstFix = true; active = true;
+        active = true;
         btn.classList.add('on-blue');
-        dot.classList.add('live');
-        document.getElementById('badgeGps').textContent = '…';
-        if (window.AndroidDownloadBridge && window.AndroidDownloadBridge.startNativeLocation) {
-          window.AndroidDownloadBridge.startNativeLocation();
-          Toast.show('OS GPS tracking <b>activated</b>', 'ok');
-        } else {
-          map.locate({ setView:false, watch:true, enableHighAccuracy:true });
-          Toast.show('GPS tracking <b>started</b>', 'ok');
-        }
+        start();
+        Toast.show('ഹൈ-ആക്യുറസി <b>GPS ട്രാക്കിംഗ്</b> ആരംഭിച്ചു', 'ok');
       } else {
-        if (window.AndroidDownloadBridge && window.AndroidDownloadBridge.stopNativeLocation) {
-          window.AndroidDownloadBridge.stopNativeLocation();
-        } else {
-          map.stopLocate();
-        }
-        if (userMarker)     { map.removeLayer(userMarker); userMarker = null; }
-        if (ring)           { map.removeLayer(ring); ring = null; }
-        if (userMarkerMini) { mini.removeLayer(userMarkerMini); userMarkerMini = null; }
-        if (ringMini)       { mini.removeLayer(ringMini); ringMini = null; }
-        active = false; btn.classList.remove('on-blue'); dot.classList.remove('live');
-        document.getElementById('badgeGps').textContent = '—';
-        Toast.show('GPS tracking <b>stopped</b>', 'info');
+        active = false;
+        btn.classList.remove('on-blue');
+        stop();
+        Toast.show('GPS ട്രാക്കിംഗ് <b>നിർത്തി</b>', 'info');
       }
     };
 
-    map.on('locationfound', e => { onLocationSuccess(e.latlng.lat, e.latlng.lng, e.accuracy); });
-    map.on('locationerror', () => { if (!window.AndroidDownloadBridge) { onLocationFailure('Leaflet locate error'); } });
-
-    return { toggle, onLocationSuccess, onLocationFailure };
+    return { toggle, onLocationSuccess: (lat, lng, acc) => onLocationUpdate({ coords: { latitude: lat, longitude: lng, accuracy: acc } }), onLocationFailure: (msg) => onLocationError({ message: msg, code: 0 }) };
   })();
 
   window.onNativeLocationFound = function(lat, lng, accuracy) {
@@ -890,14 +846,12 @@
       if (State.eraseMode) toggleErase();
       const wasActive = map.pm.GlobalDrawMode === toolType;
       clearHighlights();
-      // മുൻപ് സബ്‌ബട്ടണുകളിൽ ഉണ്ടായിരുന്ന സ്റ്റൈൽ റീസെറ്റ് ചെയ്യാൻ
       document.querySelectorAll('#group-drawGroup .mb').forEach(b => b.style.cssText = '');
       
       if (wasActive) { map.pm.disableDraw(); }
       else {
         map.pm.enableDraw(toolType, { hintMarkerStyle: { opacity: 0, fillOpacity: 0 } });
         const id = { Line:'lineBtn', Polygon:'polygonBtn', Marker:'markerBtn' }[toolType];
-        // ടാപ്പ് ചെയ്യുന്ന സബ്‌ബട്ടൺ ആക്റ്റീവ് കളർ ആക്കാൻ
         document.getElementById(id).style.cssText = 'background:var(--accent);color:#fff';
       }
       setTimeout(() => UI.syncMinimize(), 50);
@@ -1031,7 +985,6 @@
         });
       }
       
-      // ഡ്രോയിങ് കംപ്ലീറ്റ് ആയാൽ സബ്‌ബട്ടൺ നോർമൽ ആക്കാൻ
       document.getElementById('lineBtn').style.cssText = '';
       document.getElementById('polygonBtn').style.cssText = '';
     });
@@ -1151,9 +1104,7 @@
     return { trigger, toggleErase, toggleEdit, clearAll, _deleteNote, toggleRouteMode, drawShortestRoute };
   })();
 
-  /* ════════════════════════════════════
-     MODULE: FMB
-  ════════════════════════════════════ */
+  /* ── MODULE: FMB ── */
   const FMB = (() => {
     let overlay = null, overlayMini = null, imgData = '';
     let lat = 0, lng = 0, w = 0.0025, h = 0.0025, angle = 0;
@@ -1185,7 +1136,6 @@
       lat = c.lat; lng = c.lng; angle = 0; w = 0.0025; h = 0.0025;
       render();
       
-      // ഫയൽ അപ്‌ലോഡ് ആയിക്കഴിഞ്ഞാൽ ബാക്കി എല്ലാ ടൂളുകളും ദൃശ്യമാക്കുന്നു
       document.getElementById('fmbTools').style.display = 'flex';
       Toast.show('FMB loaded — use toolbar to position', 'ok');
       showUI();
@@ -1241,7 +1191,6 @@
       overlayMini && mini.removeLayer(overlayMini); overlayMini = null;
       imgData = ''; 
       
-      // FMB റിമൂവ് ചെയ്താൽ ടൂളുകൾ വീണ്ടും ഒളിപ്പിക്കുന്നു
       document.getElementById('fmbTools').style.display = 'none';
       if (State.touchMove) toggleTouch();
       Toast.show('FMB removed', 'info');
@@ -1343,9 +1292,7 @@
     return { adjust, remove, toggleTouch, getGeoRef: () => overlay ? { lat, lng, w, h, angle } : null };
   })();
 
-  /* ════════════════════════════════════
-     MODULE: IO
-  ════════════════════════════════════ */
+  /* ── MODULE: IO ── */
   const IO = (() => {
     const exportKML = () => {
       let kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>';
@@ -1441,9 +1388,7 @@
     return { exportKML };
   })();
 
-  /* ════════════════════════════════════
-     MODULE: UI
-  ════════════════════════════════════ */
+  /* ── MODULE: UI ── */
   const UI = {
     expand(name) {
       const target = document.getElementById(`group-${name}`);
@@ -1499,8 +1444,6 @@
     splash.classList.add('gone');
     setTimeout(() => splash.remove(), 400);
     showUI();
-    
-    document.getElementById('badgeLayer').textContent = 'CAD';
     
     UI.syncMinimize();
     setInterval(() => UI.syncMinimize(), 350);
