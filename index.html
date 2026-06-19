@@ -178,10 +178,26 @@
       box-shadow:var(--sh-md);
       width: calc(100% - 28px);
       max-width: 320px;
-      transition:top var(--t2) var(--ease), border-color var(--t1), box-shadow var(--t1);
+      transition:top var(--t2) var(--ease), border-color var(--t1), box-shadow var(--t1), width var(--t2) var(--ease), max-width var(--t2) var(--ease), padding var(--t2) var(--ease);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
     }
+    .searchbar.collapsed {
+      width:42px; max-width:42px; padding:0; border-color:transparent; background:transparent; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none;
+    }
+    .searchbar.collapsed input,
+    .searchbar.collapsed #searchPhoneInfo,
+    .searchbar.collapsed #searchBtn { display:none; }
+    .searchbar:not(.collapsed) #searchToggleBtn { display:none; }
+    #searchToggleBtn {
+      background:var(--accent); color:#fff; border:none;
+      width:38px; height:38px; border-radius:50%;
+      font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+      box-shadow:var(--sh-md);
+      transition:background var(--t1), transform var(--t1) var(--spring);
+    }
+    #searchToggleBtn:hover { background:var(--accent-hi); }
+    #searchToggleBtn:active { transform:scale(.88); }
     .searchbar:focus-within { border-color:var(--border-hi); box-shadow:var(--sh-md), 0 0 0 2px rgba(229,92,0,.2); }
     .searchbar input {
       background:none; border:none; outline:none;
@@ -335,9 +351,10 @@
 <div id="zoomBox"></div>
 
 <!-- Search bar ഇപ്പോൾ ടോപ്പിലേക്ക് (top: 8px) കൃത്യമായി ക്രമീകരിച്ചു -->
-<div class="searchbar" id="searchBar">
+<div class="searchbar collapsed" id="searchBar">
+  <button id="searchToggleBtn" title="Search"><i class="fa-solid fa-magnifying-glass"></i></button>
   <input type="text" id="searchInput" placeholder="Search place or lat, lng…" autocomplete="off" />
-  <span style="display:flex;align-items:center;gap:5px;flex-shrink:0;padding:0 4px;border-left:1px solid var(--border);margin-left:2px;">
+  <span id="searchPhoneInfo" style="display:flex;align-items:center;gap:5px;flex-shrink:0;padding:0 4px;border-left:1px solid var(--border);margin-left:2px;">
     <i class="fa-solid fa-phone" style="color:var(--accent);font-size:11px;"></i>
     <span style="font-family:var(--mono);font-size:10px;color:var(--accent);font-weight:500;white-space:nowrap;">9400849115</span>
   </span>
@@ -695,6 +712,19 @@
     };
     document.getElementById('searchBtn').addEventListener('click', execute);
     document.getElementById('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') execute(); });
+
+    const bar = document.getElementById('searchBar');
+    const input = document.getElementById('searchInput');
+    document.getElementById('searchToggleBtn').addEventListener('click', () => {
+      bar.classList.remove('collapsed');
+      setTimeout(() => input.focus(), 50);
+    });
+    document.addEventListener('click', (e) => {
+      if (!bar.contains(e.target) && !bar.classList.contains('collapsed') && !input.value.trim()) {
+        bar.classList.add('collapsed');
+      }
+    });
+
     return { execute };
   })();
 
