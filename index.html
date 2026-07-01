@@ -444,6 +444,8 @@
 
 <div class="ctrl-panel hud" id="ctrlPanel">
   <button class="btn btn-export" onclick="GIS.IO.exportKML()"><i class="fa-solid fa-file-export"></i>Save KML</button>
+  <button class="btn btn-export" onclick="GIS.IO.exportKMZ()"><i class="fa-solid fa-file-zipper"></i>Save KMZ</button>
+  <button class="btn btn-export" onclick="GIS.IO.exportGeoImage()"><i class="fa-solid fa-image"></i>Geo-JPEG</button>
   <label class="btn btn-import">
     <i class="fa-solid fa-file-import"></i>Load KML
     <input type="file" id="uploadFile" accept=".kml,.json,.geojson" style="display:none" />
@@ -468,6 +470,7 @@
 <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 <script src="https://unpkg.com/@mapbox/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
 
 <script>
@@ -1318,11 +1321,158 @@
       render();
     }, { passive: false });
 
-    return { adjust, remove, toggleTouch, getGeoRef: () => overlay ? { lat, lng, w, h, angle } : null };
+    return {
+      adjust, remove, toggleTouch,
+      getGeoRef: () => overlay ? { lat, lng, w, h, angle } : null,
+      getImageData: () => overlay ? imgData : null,
+    };
   })();
 
   /* ── MODULE: IO ── */
   const IO = (() => {
+    const dataURLtoBlob = (dataURL) => {
+      const [header, base64] = dataURL.split(',');
+      const mimeMatch = header.match(/data:(.*?);base64/);
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      const binary = atob(base64);
+      const arr = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+      return { blob: new Blob([arr], { type: mime }), mime };
+    };
+
+    const mimeExt = (mime) => {
+      if (mime.includes('png')) return 'png';
+      return 'jpg';
+    };
+
+    const buildTracedKmlBody = () => {
+      let body = '';
+      drawnItems.eachLayer(l => {
+        const isPolygon = l instanceof L.Polygon;
+        const rawLlngs  = l.getLatLngs ? l.getLatLngs() : null;
+        const pts = rawLlngs
+          ? (Array.isArray(rawLlngs[0]) ? rawLlngs[0] : rawLlngs)
+          : [l.getLatLng()];
+
+        if (isPolygon) {
+          const ring = [...pts, pts[0]];
+          body += '<Placemark><Style><PolyStyle><color>801469ff</color><fill>1</fill><outline>1</outline></PolyStyle><LineStyle><color>ff1469ff</color><width>2</width></LineStyle></Style>';
+          body += '<Polygon><outerBoundaryIs><LinearRing><coordinates>';
+          ring.forEach(p => { body += `${p.lng},${p.lat},0 `; });
+          body += '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>';
+        } else {
+          body += '<Placemark><LineString><coordinates>';
+          pts.forEach(p => { body += `${p.lng},${p.lat},0 `; });
+          body += '</coordinates></LineString></Placemark>';
+        }
+      });
+      return body;
+    };
+
+    // KMZ export — bundles the actual FMB image inside the archive so it opens
+    // pre-georeferenced in Google Earth / Google My Maps / any KMZ-compatible app.
+    const exportKMZ = async () => {
+      const fmbRef = FMB.getGeoRef ? FMB.getGeoRef() : null;
+      if (!fmbRef) { Toast.show('ആദ്യം FMB ലോഡ് ചെയ്ത് ജിയോറഫറൻസ് ചെയ്യുക', 'warn'); return; }
+      const imgData = FMB.getImageData ? FMB.getImageData() : null;
+      if (!imgData) { Toast.show('FMB ഇമേജ് കണ്ടെത്താനായില്ല', 'error'); return; }
+      if (typeof JSZip === 'undefined') { Toast.show('JSZip ലോഡ് ആയില്ല — ഇന്റർനെറ്റ് കണക്ഷൻ പരിശോധിക്കുക', 'error'); return; }
+
+      Toast.show('KMZ തയ്യാറാക്കുന്നു…', 'info');
+
+      const { blob: imgBlob, mime } = dataURLtoBlob(imgData);
+      const ext = mimeExt(mime);
+      const imgFileName = `files/fmb_overlay.${ext}`;
+
+      const { lat, lng, w, h, angle } = fmbRef;
+      const south = lat - h / 2, north = lat + h / 2;
+      const west  = lng - w / 2, east  = lng + w / 2;
+
+      let kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>';
+      kml += `<name>Sodestus FMB Map</name>`;
+      kml += `<GroundOverlay><name>FMB GeoReference</name>`;
+      kml += `<Icon><href>${imgFileName}</href></Icon>`;
+      kml += `<LatLonBox><north>${north.toFixed(8)}</north><south>${south.toFixed(8)}</south><east>${east.toFixed(8)}</east><west>${west.toFixed(8)}</west><rotation>${(-angle).toFixed(4)}</rotation></LatLonBox>`;
+      kml += `</GroundOverlay>`;
+      kml += buildTracedKmlBody();
+      kml += '</Document></kml>';
+
+      try {
+        const zip = new JSZip();
+        zip.file('doc.kml', kml);
+        zip.file(imgFileName, imgBlob);
+        const content = await zip.generateAsync({ type: 'blob' });
+
+        const a = Object.assign(document.createElement('a'), {
+          href: URL.createObjectURL(content),
+          download: 'Sodestus_FMB_Map.kmz',
+        });
+        a.click(); URL.revokeObjectURL(a.href);
+        Toast.show('KMZ എക്സ്പോർട്ട് ചെയ്തു — Google Earth / My Maps ൽ import ചെയ്യാം', 'ok');
+      } catch (err) {
+        Toast.show(`KMZ export പിഴവ്: ${err.message}`, 'error');
+      }
+    };
+
+    // Georeferenced image export — FMB JPEG/PNG + World File (.jgw/.pgw) + .prj,
+    // the standard format for QGIS / ArcGIS / AutoCAD Map and similar GIS tools.
+    const exportGeoImage = async () => {
+      const fmbRef = FMB.getGeoRef ? FMB.getGeoRef() : null;
+      const imgData = FMB.getImageData ? FMB.getImageData() : null;
+      if (!fmbRef || !imgData) { Toast.show('ആദ്യം FMB ലോഡ് ചെയ്ത് ജിയോറഫറൻസ് ചെയ്യുക', 'warn'); return; }
+      if (typeof JSZip === 'undefined') { Toast.show('JSZip ലോഡ് ആയില്ല — ഇന്റർനെറ്റ് കണക്ഷൻ പരിശോധിക്കുക', 'error'); return; }
+
+      Toast.show('Geo-JPEG തയ്യാറാക്കുന്നു…', 'info');
+
+      try {
+        const im = await new Promise((res, rej) => {
+          const i = new Image();
+          i.onload = () => res(i);
+          i.onerror = rej;
+          i.src = imgData;
+        });
+        const pxW = im.naturalWidth, pxH = im.naturalHeight;
+
+        const { lat, lng, w, h, angle } = fmbRef;
+        const theta = angle * Math.PI / 180;
+        const A0 = w / pxW;          // deg longitude per pixel (unrotated)
+        const E0 = -(h / pxH);       // deg latitude per pixel (unrotated, negative = south-going rows)
+        const cosT = Math.cos(theta), sinT = Math.sin(theta);
+        const ox = 0.5 - pxW / 2;    // pixel(0,0) center offset from image center, in px
+        const oy = 0.5 - pxH / 2;
+
+        // Affine world-file coefficients, accounting for on-screen rotation.
+        const A =  cosT * A0;
+        const D = -sinT * A0;
+        const B =  sinT * E0;
+        const E =  cosT * E0;
+        const C = lng + cosT * ox * A0 + sinT * oy * E0;
+        const F = lat + (-sinT * ox * A0 + cosT * oy * E0);
+
+        const worldFile = [A, D, B, E, C, F].map(v => v.toFixed(12)).join('\n');
+        const prj = 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]]';
+
+        const { blob: imgBlob, mime } = dataURLtoBlob(imgData);
+        const ext = mimeExt(mime);
+        const worldExt = ext === 'png' ? 'pgw' : 'jgw';
+
+        const zip = new JSZip();
+        zip.file(`FMB_Georeferenced.${ext}`, imgBlob);
+        zip.file(`FMB_Georeferenced.${worldExt}`, worldFile);
+        zip.file(`FMB_Georeferenced.prj`, prj);
+
+        const content = await zip.generateAsync({ type: 'blob' });
+        const a = Object.assign(document.createElement('a'), {
+          href: URL.createObjectURL(content),
+          download: 'Sodestus_FMB_Georeferenced.zip',
+        });
+        a.click(); URL.revokeObjectURL(a.href);
+        Toast.show('Geo-JPEG + World File എക്സ്പോർട്ട് ചെയ്തു — QGIS/ArcGIS ൽ നേരിട്ട് തുറക്കാം', 'ok');
+      } catch (err) {
+        Toast.show(`Export പിഴവ്: ${err.message}`, 'error');
+      }
+    };
+
     const exportKML = () => {
       let kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>';
 
@@ -1414,7 +1564,7 @@
       reader.readAsText(file);
     });
 
-    return { exportKML };
+    return { exportKML, exportKMZ, exportGeoImage };
   })();
 
   /* ── MODULE: UI ── */
