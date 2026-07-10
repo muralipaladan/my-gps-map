@@ -60,50 +60,75 @@
     }
     .show-ui .hud { opacity:1; visibility:visible; pointer-events:auto; }
 
-    .ribbon {
-      position:absolute; top:94px; left:14px; z-index:2000;
-      width:var(--ribbon-w);
-      display:flex; flex-direction:column; align-items:center; gap:5px;
-      background:var(--surface);
-      border:1px solid var(--border);
-      border-radius:var(--r-lg);
-      padding:10px 5px;
-      box-shadow:var(--sh-lg);
-      max-height:88vh; overflow-y:auto; overflow-x:hidden;
-      scrollbar-width:none;
-      transform:translateX(0);
-      transition: top var(--t2) var(--ease), padding var(--t2) var(--ease), background var(--t2) var(--ease), border-color var(--t2) var(--ease), opacity var(--t2) var(--ease);
+    .side-dock {
+      position:absolute; top:94px; left:14px; z-index:2100;
+      display:flex; flex-direction:column; align-items:center; gap:8px;
     }
-    .ribbon::-webkit-scrollbar { display:none; }
-    .ribbon::after {
-      content:''; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
-      background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(255,255,255,.008) 3px,rgba(255,255,255,.008) 4px);
-    }
-    .rdiv { width:72%; height:1px; background:var(--border); flex-shrink:0; margin:2px 0; }
 
-    .ribbon.minimized:not(.expanded-touch):not(:hover) > *:not(#gpsBtn):not(#drawMainGroupBtn):not(#layerBtn):not(#fmbLoadLabel):not(#fmbTools):not(.sub-group.open) {
-      display: none !important;
+    .panel-backdrop {
+      position:absolute; inset:0; z-index:2400;
+      background:rgba(0,0,0,.35); backdrop-filter:blur(2px);
+      opacity:0; visibility:hidden; transition:opacity var(--t2) var(--ease), visibility var(--t2) var(--ease);
     }
-    .ribbon.minimized {
-      padding: 5px;
-      background: rgba(10, 13, 20, 0.55);
-      border-color: rgba(255, 255, 255, 0.05);
-      gap: 4px;
-      box-shadow: var(--sh-sm);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      opacity: 0.35;
+    .panel-backdrop.open { opacity:1; visibility:visible; }
+
+    .side-panel {
+      position:absolute; top:0; left:0; bottom:0; z-index:2500;
+      width:238px; max-width:78vw;
+      background:var(--surface); border-right:1px solid var(--border-hi);
+      box-shadow:var(--sh-lg);
+      display:flex; flex-direction:column;
+      transform:translateX(-100%);
+      transition:transform var(--t2) var(--ease);
     }
-    
-    .ribbon.minimized.expanded-touch,
-    .ribbon.minimized:hover {
-      padding: 10px 5px;
-      background: var(--surface);
-      border-color: var(--border);
-      gap: 5px;
-      box-shadow: var(--sh-lg);
-      opacity: 1 !important;
+    .side-panel.open { transform:translateX(0); }
+
+    .panel-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:16px 16px 12px; border-bottom:1px solid var(--border); flex-shrink:0;
     }
+    .panel-header .panel-title {
+      font-family:var(--font); font-size:13px; font-weight:800; letter-spacing:1.4px;
+      color:var(--text); text-transform:uppercase;
+    }
+    .panel-header .panel-title span { color:var(--accent); }
+    .panel-close {
+      width:30px; height:30px; border-radius:50%; border:1px solid var(--border);
+      background:var(--surface-2); color:var(--text-mid); cursor:pointer;
+      display:flex; align-items:center; justify-content:center; font-size:13px;
+      transition:background var(--t1), color var(--t1), transform var(--t1) var(--spring);
+    }
+    .panel-close:hover  { background:var(--surface-3); color:var(--text); }
+    .panel-close:active { transform:scale(.88); }
+
+    .panel-body { flex:1; overflow-y:auto; overflow-x:hidden; padding:10px 12px 16px; scrollbar-width:thin; }
+
+    .tool-cat { border:1px solid var(--border); border-radius:var(--r-md); margin-bottom:9px; overflow:hidden; background:rgba(255,255,255,.02); }
+    .cat-head {
+      width:100%; display:flex; align-items:center; gap:10px;
+      background:var(--surface-2); border:none; padding:11px 12px; cursor:pointer;
+      font-family:var(--font); color:var(--text); text-align:left;
+      transition:background var(--t1);
+    }
+    .cat-head:hover { background:var(--surface-3); }
+    .cat-head .cat-icon {
+      width:26px; height:26px; border-radius:var(--r-sm); flex-shrink:0;
+      background:var(--surface-3); display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--accent-hi);
+    }
+    .cat-head .cat-label { flex:1; font-size:12px; font-weight:700; letter-spacing:.4px; }
+    .cat-head .cat-chev { font-size:10px; color:var(--text-dim); transition:transform var(--t1) var(--ease); }
+    .tool-cat.open .cat-head .cat-chev { transform:rotate(180deg); }
+    .tool-cat.open .cat-head { border-bottom:1px solid var(--border); }
+
+    .cat-body {
+      display:none; flex-wrap:wrap; gap:6px; padding:11px 12px;
+      animation:sgIn var(--t1) var(--ease) both;
+    }
+    .tool-cat.open .cat-body { display:flex; }
+    .cat-body .cat-full { width:100%; }
+    .cat-body .cat-divider { width:100%; height:1px; background:var(--border); margin:2px 0; }
+    .cat-body .cat-hint { width:100%; font-size:10.5px; color:var(--text-dim); line-height:1.5; margin-bottom:2px; }
+    @keyframes sgIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
 
     .rb {
       position:relative; width:38px; height:38px; flex-shrink:0;
@@ -116,7 +141,7 @@
     }
     .rb:hover  { background:var(--surface-3); border-color:var(--border-hi); transform:scale(1.07); }
     .rb:active { transform:scale(0.91); }
-    .rb.on-accent { background:var(--accent)!important; color:#fff!important; border-color:var(--accent-hi)!important; box-shadow:0 0 14px var(--accent-glow); }
+    .rb.on-accent, .mb.on-accent { background:var(--accent)!important; color:#fff!important; border-color:var(--accent-hi)!important; box-shadow:0 0 14px var(--accent-glow); }
     .rb.on-green  { background:var(--green)!important;  color:#fff!important; border-color:#15803d!important; box-shadow:0 0 12px var(--green-glow); }
     .rb.on-blue   { background:var(--blue)!important;   color:#fff!important; border-color:#1d4ed8!important; box-shadow:0 0 14px var(--blue-glow); animation:gpsGlow 2s ease-in-out infinite; }
     .rb.on-red    { background:rgba(220,38,38,.14)!important; color:var(--red)!important; border-color:rgba(220,38,38,.35)!important; }
@@ -138,13 +163,7 @@
     }
     .rb[data-tip]:hover::after { opacity:1; transform:translateY(-50%) translateX(0); }
 
-    .sub-group {
-      display:none; flex-direction:column; align-items:center; gap:4px;
-      background:rgba(255,255,255,.035); border:1px solid var(--border);
-      border-radius:var(--r-sm); padding:6px; width:92%;
-    }
-    .sub-group.open { display:flex; animation:sgIn var(--t2) var(--ease) both; }
-    @keyframes sgIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none} }
+    .mb-fmb-row { display:flex; gap:4px; width:100%; }
 
     .mb {
       width:30px; height:30px;
@@ -315,7 +334,13 @@
     .p-nav:hover, .p-del:hover { filter:brightness(1.2); }
     .area-label { font-size:11px; color:var(--text-mid); margin-top:3px; }
 
-    .wms-style-force { filter:contrast(400%) brightness(50%) saturate(8) hue-rotate(320deg)!important; opacity:.9; }
+    /* International-standard cadastral/parcel boundary colour (surveying-red),
+       forced uniformly regardless of the source WMS style so it reads clearly
+       on both the satellite Hybrid basemap and the Road basemap. */
+    .parcel-red {
+      filter: brightness(0) saturate(100%) invert(13%) sepia(96%) saturate(7484%) hue-rotate(356deg) brightness(101%) contrast(119%);
+      opacity:.92;
+    }
 
     .leaflet-control-layers, .leaflet-control-geocoder, .leaflet-pm-toolbar { display:none!important; }
 
@@ -363,82 +388,123 @@
 
 <!-- ഹഡ് ബാഡ്ജ് (HUD Badge Ribbon) റിമൂവ് ചെയ്തു -->
 
-<div class="ribbon" id="ribbon">
-  <!-- 1. LIVE GPS -->
+<div class="side-dock">
+  <!-- ALWAYS VISIBLE: LIVE GPS -->
   <button class="rb" id="gpsBtn" data-tip="Live GPS" onclick="GIS.GPS.toggle()"><i class="fa-solid fa-crosshairs"></i></button>
-  
-  <div class="rdiv"></div>
+  <!-- MENU TOGGLE: opens the tools drawer -->
+  <button class="rb" id="menuToggleBtn" data-tip="Tools Menu" onclick="GIS.UI.toggleMenu()"><i class="fa-solid fa-bars"></i></button>
+</div>
 
-  <!-- 2. DRAWING TOOL MAIN TAB -->
-  <button class="rb" id="drawMainGroupBtn" data-tip="Drawing Tools" onclick="GIS.UI.expand('drawGroup')"><i class="fa-solid fa-pen-ruler"></i></button>
-  
-  <div class="sub-group" id="group-drawGroup">
-    <button class="mb" id="markerBtn"  title="Save Note (Location Pin)" onclick="GIS.Draw.trigger('Marker')"> <i class="fa-solid fa-location-dot"></i></button>
-    <button class="mb" id="lineBtn"    title="Draw Line"    onclick="GIS.Draw.trigger('Line')">   <i class="fa-solid fa-file-signature"></i></button>
-    <button class="mb" id="polygonBtn" title="Draw Polygon" onclick="GIS.Draw.trigger('Polygon')"><i class="fa-solid fa-draw-polygon"></i></button>
-    <button class="mb" id="routeModeBtn" title="Route Planner" onclick="GIS.Draw.toggleRouteMode()"><i class="fa-solid fa-route"></i></button>
-    <button class="mb" id="editBtn"    title="Edit Shapes"  onclick="GIS.Draw.toggleEdit()"><i class="fa-solid fa-pen-to-square"></i></button>
-    <button class="mb" id="eraseModeBtn" title="Touch Erase" onclick="GIS.Draw.toggleErase()"><i class="fa-solid fa-eraser"></i></button>
-    <button class="mb" title="Clear All"  onclick="GIS.Draw.clearAll()"  style="color:var(--red)"><i class="fa-solid fa-trash-can"></i></button>
+<div class="panel-backdrop" id="panelBackdrop" onclick="GIS.UI.toggleMenu(false)"></div>
+
+<div class="side-panel" id="sidePanel">
+  <div class="panel-header">
+    <span class="panel-title">Sodestus <span>Tools</span></span>
+    <button class="panel-close" onclick="GIS.UI.toggleMenu(false)"><i class="fa-solid fa-xmark"></i></button>
   </div>
 
-  <div class="rdiv"></div>
+  <div class="panel-body">
 
-  <!-- 3. LAYER TAB -->
-  <button class="rb" id="layerBtn" data-tip="Layers" onclick="GIS.UI.expand('layers')"><i class="fa-solid fa-layer-group"></i></button>
-  <div class="sub-group" id="group-layers">
-    <button class="mb" title="Hybrid"       onclick="GIS.Layers.setBase('hybrid')" style="font-size:9px;font-weight:800;letter-spacing:.5px">HYB</button>
-    <button class="mb" title="Road"         onclick="GIS.Layers.setBase('road')"   style="font-size:9px;font-weight:800;letter-spacing:.5px">ROAD</button>
-    <button class="mb" title="OpenStreetMap"onclick="GIS.Layers.setBase('osm')"    style="font-size:9px;font-weight:800;letter-spacing:.5px">OSM</button>
-    <div style="width:100%;height:1px;background:var(--border);margin:3px 0"></div>
-    <button class="mb" id="btnVil" title="Village WMS"    onclick="GIS.Layers.toggleWms('village')"   style="font-size:9px;font-weight:800">VIL</button>
-    <button class="mb" id="btnCad" title="Cadastral WMS"  onclick="GIS.Layers.toggleWms('cadastral')" style="background:var(--amber);color:#000;font-size:9px;font-weight:800">CAD</button>
-  </div>
-
-  <div class="rdiv"></div>
-
-  <!-- 4. FMB UPLOAD BUTTON -->
-  <label class="rb on-green" id="fmbLoadLabel" data-tip="Load FMB" title="Load FMB Image/PDF">
-    <i class="fa-solid fa-image"></i>
-    <input type="file" id="uploadFMB" accept=".jpg,.jpeg,.png,.pdf" style="display:none" />
-  </label>
-
-  <div id="fmbTools" style="display:none;flex-direction:column;align-items:center;gap:5px;width:100%">
-    <div class="rdiv"></div>
-    <button class="rb" id="touchMoveBtn" data-tip="Touch Move" onclick="GIS.FMB.toggleTouch()"><i class="fa-solid fa-hand-pointer"></i></button>
-    <div class="rdiv"></div>
-
-    <button class="rb" id="mainMoveBtn" data-tip="Move FMB" onclick="GIS.UI.expand('move')"><i class="fa-solid fa-arrows-up-down-left-right"></i></button>
-    <div class="sub-group" id="group-move">
-      <button class="mb" onclick="GIS.FMB.adjust('up')">↑</button>
-      <div class="mb-row">
-        <button class="mb" onclick="GIS.FMB.adjust('left')">←</button>
-        <button class="mb" onclick="GIS.FMB.adjust('right')">→</button>
-      </div>
-      <button class="mb" onclick="GIS.FMB.adjust('down')">↓</button>
-    </div>
-
-    <button class="rb" id="mainScaleBtn" data-tip="Resize FMB" onclick="GIS.UI.expand('scale')"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
-    <div class="sub-group" id="group-scale">
-      <button class="mb" onclick="GIS.FMB.adjust('zoomin')"><i class="fa-solid fa-plus"></i></button>
-      <button class="mb" onclick="GIS.FMB.adjust('zoomout')"><i class="fa-solid fa-minus"></i></button>
-    </div>
-
-    <button class="rb" id="mainRotateBtn" data-tip="Rotate FMB" onclick="GIS.UI.expand('rotate')"><i class="fa-solid fa-rotate"></i></button>
-    <div class="sub-group" id="group-rotate">
-      <button class="mb" onclick="GIS.FMB.adjust('rotL')"><i class="fa-solid fa-rotate-left"></i></button>
-      <button class="mb" onclick="GIS.FMB.adjust('rotR')"><i class="fa-solid fa-rotate-right"></i></button>
-    </div>
-
-    <button class="rb" id="mainOpacityBtn" data-tip="Opacity" onclick="GIS.UI.expand('opacity')"><i class="fa-solid fa-circle-half-stroke"></i></button>
-    <div class="sub-group" id="group-opacity">
-      <div class="slider-wrap">
-        <input type="range" id="fmbOpacity" class="vslider" min="0.1" max="1" step="0.05" value="0.6" />
+    <!-- LAYER TAB -->
+    <div class="tool-cat" id="cat-layers">
+      <button class="cat-head" onclick="GIS.UI.toggleCat('layers')">
+        <span class="cat-icon"><i class="fa-solid fa-layer-group"></i></span>
+        <span class="cat-label">Layers</span>
+        <i class="fa-solid fa-chevron-down cat-chev"></i>
+      </button>
+      <div class="cat-body">
+        <div class="cat-hint">Basemap</div>
+        <button class="mb" title="Hybrid"        onclick="GIS.Layers.setBase('hybrid')" style="font-size:9px;font-weight:800;letter-spacing:.5px">HYB</button>
+        <button class="mb" title="Road"          onclick="GIS.Layers.setBase('road')"   style="font-size:9px;font-weight:800;letter-spacing:.5px">ROAD</button>
+        <button class="mb" title="OpenStreetMap" onclick="GIS.Layers.setBase('osm')"    style="font-size:9px;font-weight:800;letter-spacing:.5px">OSM</button>
+        <div class="cat-divider"></div>
+        <div class="cat-hint">Cadastral WMS</div>
+        <button class="mb" id="btnVil" title="Village WMS"    onclick="GIS.Layers.toggleWms('village')"   style="font-size:9px;font-weight:800">VIL</button>
+        <button class="mb" id="btnCad" title="Cadastral WMS"  onclick="GIS.Layers.toggleWms('cadastral')" style="background:var(--amber);color:#000;font-size:9px;font-weight:800">CAD</button>
+        <div class="cat-divider"></div>
+        <div class="cat-hint">KSUDP Survey Parcel</div>
+        <button class="mb" id="btnKCH" title="KSUDP Kochi Parcel"      onclick="GIS.Layers.toggleWms('parcelKCH')" style="font-size:9px;font-weight:800">KCH</button>
+        <button class="mb" id="btnKKD" title="KSUDP Kozhikode Parcel"  onclick="GIS.Layers.toggleWms('parcelKKD')" style="font-size:9px;font-weight:800">KKD</button>
+        <button class="mb" id="btnKLM" title="KSUDP Kollam Parcel"     onclick="GIS.Layers.toggleWms('parcelKLM')" style="font-size:9px;font-weight:800">KLM</button>
+        <button class="mb" id="btnTCR" title="KSUDP Thrissur Parcel"   onclick="GIS.Layers.toggleWms('parcelTCR')" style="font-size:9px;font-weight:800">TCR</button>
+        <button class="mb" id="btnTVM" title="KSUDP Trivandrum Parcel" onclick="GIS.Layers.toggleWms('parcelTVM')" style="font-size:9px;font-weight:800">TVM</button>
       </div>
     </div>
 
-    <div class="rdiv"></div>
-    <button class="rb on-red" data-tip="Remove FMB" onclick="GIS.FMB.remove()"><i class="fa-solid fa-trash"></i></button>
+    <!-- DRAWING TOOL TAB -->
+    <div class="tool-cat" id="cat-draw">
+      <button class="cat-head" onclick="GIS.UI.toggleCat('draw')">
+        <span class="cat-icon"><i class="fa-solid fa-pen-ruler"></i></span>
+        <span class="cat-label">Drawing Tools</span>
+        <i class="fa-solid fa-chevron-down cat-chev"></i>
+      </button>
+      <div class="cat-body">
+        <button class="mb" id="markerBtn"  title="Save Note (Location Pin)" onclick="GIS.Draw.trigger('Marker')"> <i class="fa-solid fa-location-dot"></i></button>
+        <button class="mb" id="lineBtn"    title="Draw Line"    onclick="GIS.Draw.trigger('Line')">   <i class="fa-solid fa-file-signature"></i></button>
+        <button class="mb" id="polygonBtn" title="Draw Polygon" onclick="GIS.Draw.trigger('Polygon')"><i class="fa-solid fa-draw-polygon"></i></button>
+        <button class="mb" id="editBtn"    title="Edit Shapes"  onclick="GIS.Draw.toggleEdit()"><i class="fa-solid fa-pen-to-square"></i></button>
+        <button class="mb" id="eraseModeBtn" title="Touch Erase" onclick="GIS.Draw.toggleErase()"><i class="fa-solid fa-eraser"></i></button>
+        <button class="mb" title="Clear All"  onclick="GIS.Draw.clearAll()"  style="color:var(--red)"><i class="fa-solid fa-trash-can"></i></button>
+      </div>
+    </div>
+
+    <!-- GEOREFERENCE TOOL TAB -->
+    <div class="tool-cat" id="cat-georef">
+      <button class="cat-head" onclick="GIS.UI.toggleCat('georef')">
+        <span class="cat-icon"><i class="fa-solid fa-map-location-dot"></i></span>
+        <span class="cat-label">Georeference Tools</span>
+        <i class="fa-solid fa-chevron-down cat-chev"></i>
+      </button>
+      <div class="cat-body">
+        <label class="mb cat-full" id="fmbLoadLabel" title="Load FMB Image/PDF" style="width:100%;height:32px;gap:6px;font-size:10.5px;font-weight:700;background:var(--green);color:#fff;">
+          <i class="fa-solid fa-image"></i> Load FMB
+          <input type="file" id="uploadFMB" accept=".jpg,.jpeg,.png,.pdf" style="display:none" />
+        </label>
+
+        <div id="fmbTools" style="display:none;flex-wrap:wrap;gap:6px;width:100%">
+          <div class="cat-divider"></div>
+          <button class="mb cat-full" id="touchMoveBtn" title="Touch Move FMB" onclick="GIS.FMB.toggleTouch()" style="width:100%;gap:6px;font-size:10.5px;font-weight:700"><i class="fa-solid fa-hand-pointer"></i> Touch Move</button>
+
+          <div class="cat-hint">Position</div>
+          <div class="mb-fmb-row" style="justify-content:center">
+            <button class="mb" onclick="GIS.FMB.adjust('up')">↑</button>
+          </div>
+          <div class="mb-fmb-row" style="justify-content:center">
+            <button class="mb" onclick="GIS.FMB.adjust('left')">←</button>
+            <button class="mb" onclick="GIS.FMB.adjust('down')">↓</button>
+            <button class="mb" onclick="GIS.FMB.adjust('right')">→</button>
+          </div>
+
+          <div class="cat-hint">Scale / Rotate</div>
+          <button class="mb" title="Zoom In"  onclick="GIS.FMB.adjust('zoomin')"><i class="fa-solid fa-plus"></i></button>
+          <button class="mb" title="Zoom Out" onclick="GIS.FMB.adjust('zoomout')"><i class="fa-solid fa-minus"></i></button>
+          <button class="mb" title="Rotate Left"  onclick="GIS.FMB.adjust('rotL')"><i class="fa-solid fa-rotate-left"></i></button>
+          <button class="mb" title="Rotate Right" onclick="GIS.FMB.adjust('rotR')"><i class="fa-solid fa-rotate-right"></i></button>
+
+          <div class="cat-hint">Opacity</div>
+          <div class="slider-wrap cat-full">
+            <input type="range" id="fmbOpacity" class="vslider" min="0.1" max="1" step="0.05" value="0.6" style="width:100%" />
+          </div>
+
+          <div class="cat-divider"></div>
+          <button class="mb cat-full" title="Remove FMB" onclick="GIS.FMB.remove()" style="width:100%;gap:6px;font-size:10.5px;font-weight:700;background:rgba(220,38,38,.14);color:var(--red)"><i class="fa-solid fa-trash"></i> Remove FMB</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NAVIGATION TOOL TAB -->
+    <div class="tool-cat" id="cat-nav">
+      <button class="cat-head" onclick="GIS.UI.toggleCat('nav')">
+        <span class="cat-icon"><i class="fa-solid fa-route"></i></span>
+        <span class="cat-label">Navigation Tools</span>
+        <i class="fa-solid fa-chevron-down cat-chev"></i>
+      </button>
+      <div class="cat-body">
+        <div class="cat-hint">Tap a point on the map, or a saved note's Navigate button, to route from your live location.</div>
+        <button class="mb cat-full" id="routeModeBtn" title="Route Planner" onclick="GIS.Draw.toggleRouteMode()" style="width:100%;gap:6px;font-size:10.5px;font-weight:700"><i class="fa-solid fa-route"></i> Route Planner</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -567,8 +633,13 @@
 
   const WMS_BASE = { format:'image/png', transparent:true, maxZoom:22, tileSize:512, zoomOffset:-1, pane:'cadastralPane' };
   const wmsLayers = {
-    village:   L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, layers:'v3:village',    className:'wms-style-force' }),
-    cadastral: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, layers:'Kerala:Cadastry_Kerala' }),
+    village:   L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, layers:'v3:village',    className:'parcel-red' }),
+    cadastral: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, layers:'Kerala:Cadastry_Kerala', className:'parcel-red' }),
+    parcelKCH: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, layers:'Kerala:KSUDP_KCH_Survey_Parcel_acpc', className:'parcel-red' }),
+    parcelKKD: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, layers:'Kerala:KSUDP_KKD_Survey_Parcel_acpc', className:'parcel-red' }),
+    parcelKLM: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, layers:'Kerala:KSUDP_KLM_Survey_Parcel_acpc', className:'parcel-red' }),
+    parcelTCR: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, layers:'Kerala:KSUDP_TCR_Survey_Parcel_acpc', className:'parcel-red' }),
+    parcelTVM: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, layers:'Kerala:KSUDP_TVM_Survey_Parcel_acpc', className:'parcel-red' }),
   };
   
   map.addLayer(wmsLayers.cadastral);
@@ -589,8 +660,13 @@
   Object.assign(mini.getPane('miniCadastral').style, { zIndex:'600', pointerEvents:'none' });
 
   const miniWms = {
-    village:   L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'v3:village',    className:'wms-style-force' }),
-    cadastral: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'Kerala:Cadastry_Kerala' }),
+    village:   L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'v3:village',    className:'parcel-red' }),
+    cadastral: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'Kerala:Cadastry_Kerala', className:'parcel-red' }),
+    parcelKCH: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'Kerala:KSUDP_KCH_Survey_Parcel_acpc', className:'parcel-red' }),
+    parcelKKD: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'Kerala:KSUDP_KKD_Survey_Parcel_acpc', className:'parcel-red' }),
+    parcelKLM: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'Kerala:KSUDP_KLM_Survey_Parcel_acpc', className:'parcel-red' }),
+    parcelTCR: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'Kerala:KSUDP_TCR_Survey_Parcel_acpc', className:'parcel-red' }),
+    parcelTVM: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'Kerala:KSUDP_TVM_Survey_Parcel_acpc', className:'parcel-red' }),
   };
   
   mini.addLayer(miniWms.cadastral);
@@ -672,8 +748,8 @@
     },
     toggleWms(type) {
       const layer = wmsLayers[type], mLayer = miniWms[type];
-      const btnId = type === 'village' ? 'btnVil' : 'btnCad';
-      const btn   = document.getElementById(btnId);
+      const BTN_IDS = { village:'btnVil', cadastral:'btnCad', parcelKCH:'btnKCH', parcelKKD:'btnKKD', parcelKLM:'btnKLM', parcelTCR:'btnTCR', parcelTVM:'btnTVM' };
+      const btn   = document.getElementById(BTN_IDS[type]);
       if (map.hasLayer(layer)) {
         map.removeLayer(layer); mini.removeLayer(mLayer);
         btn.style.cssText = '';
@@ -861,6 +937,7 @@
         L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(
           `<b>📍 Note</b><br>${p.text}
            <button class="p-nav" style="background:var(--blue); color:#fff; border:1px solid #1d4ed8; margin-top:6px;" onclick="GIS.Draw.drawShortestRoute(${p.lat}, ${p.lng})"><i class='fa-solid fa-route'></i> Show Route</button>
+           <button class="p-nav" style="background:#0b8043; color:#fff; border:1px solid #076a34; margin-top:6px;" onclick="GIS.Draw.navigateExternal(${p.lat}, ${p.lng})"><i class='fa-solid fa-diamond-turn-right'></i> Navigate</button>
            <button class="p-del" onclick="GIS.Draw._deleteNote(${i})"><i class='fa-solid fa-trash'></i> Delete</button>`
         );
         L.marker([p.lat, p.lng]).addTo(pinGroupMini);
@@ -878,7 +955,7 @@
       if (State.eraseMode) toggleErase();
       const wasActive = map.pm.GlobalDrawMode === toolType;
       clearHighlights();
-      document.querySelectorAll('#group-drawGroup .mb').forEach(b => b.style.cssText = '');
+      document.querySelectorAll('#cat-draw .mb').forEach(b => b.style.cssText = '');
       
       if (wasActive) { map.pm.disableDraw(); }
       else {
@@ -1133,7 +1210,12 @@
       }
     };
 
-    return { trigger, toggleErase, toggleEdit, clearAll, _deleteNote, toggleRouteMode, drawShortestRoute };
+    const navigateExternal = (lat, lng) => {
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+      window.open(url, '_blank');
+    };
+
+    return { trigger, toggleErase, toggleEdit, clearAll, _deleteNote, toggleRouteMode, drawShortestRoute, navigateExternal };
   })();
 
   /* ── MODULE: FMB ── */
@@ -1568,50 +1650,36 @@
   })();
 
   /* ── MODULE: UI ── */
+  const CATS = ['layers', 'draw', 'georef', 'nav'];
   const UI = {
-    expand(name) {
-      const target = document.getElementById(`group-${name}`);
-      const wasOpen = target?.classList.contains('open');
-      TOOL_GROUPS.forEach(g => {
-        document.getElementById(`group-${g}`)?.classList.remove('open');
-        const ids = [`main${g.charAt(0).toUpperCase()+g.slice(1)}Btn`, `${g}Btn`, 'drawMainGroupBtn'];
-        ids.forEach(id => document.getElementById(id)?.classList.remove('on-accent'));
-      });
-      if (target && !wasOpen) {
-        target.classList.add('open');
-        const mainBtnId = name === 'drawGroup' ? 'drawMainGroupBtn' : `${name}Btn`;
-        document.getElementById(mainBtnId)?.classList.add('on-accent');
-      }
-      this.syncMinimize();
+    toggleMenu(force) {
+      const panel = document.getElementById('sidePanel');
+      const backdrop = document.getElementById('panelBackdrop');
+      const menuBtn = document.getElementById('menuToggleBtn');
+      const open = typeof force === 'boolean' ? force : !panel.classList.contains('open');
+      panel.classList.toggle('open', open);
+      backdrop.classList.toggle('open', open);
+      menuBtn.classList.toggle('on-accent', open);
     },
-    syncMinimize() {
-      const ribbon = document.getElementById('ribbon');
-      if (!ribbon) return;
-
-      if (ribbon.matches(':hover') || ribbon.classList.contains('expanded-touch')) {
-        ribbon.classList.remove('minimized');
-        return;
-      }
-
+    toggleCat(name) {
+      const target = document.getElementById(`cat-${name}`);
+      const wasOpen = target?.classList.contains('open');
+      CATS.forEach(c => document.getElementById(`cat-${c}`)?.classList.remove('open'));
+      if (target && !wasOpen) target.classList.add('open');
+    },
+    /* Auto-closes the drawer once a map-editing tool becomes active, so the
+       map gets full screen space while the person is actually working. */
+    closeMenuIfToolActive() {
       const hasActiveDraw = !!(map.pm && map.pm.GlobalDrawMode);
       const hasActiveEdit = !!State.editMode;
       const hasActiveRoute = !!State.routeMode;
       const hasActiveErase = !!State.eraseMode;
       const hasActiveTouchMove = !!State.touchMove;
-
-      const subgroups = Array.from(document.querySelectorAll('.sub-group'));
-      const anySubgroupOpen = subgroups.some(sg => sg.classList.contains('open'));
-
-      const hasHighlightedButton = !!document.querySelector('.rb.on-accent');
-
-      const shouldMinimize = hasActiveDraw || hasActiveEdit || hasActiveRoute || hasActiveErase || hasActiveTouchMove || anySubgroupOpen || hasHighlightedButton;
-
-      if (shouldMinimize) {
-        ribbon.classList.add('minimized');
-      } else {
-        ribbon.classList.remove('minimized');
+      if (hasActiveDraw || hasActiveEdit || hasActiveRoute || hasActiveErase || hasActiveTouchMove) {
+        this.toggleMenu(false);
       }
-    }
+    },
+    syncMinimize() { this.closeMenuIfToolActive(); } // kept as alias so existing call sites keep working
   };
 
   /* ── PUBLIC NAMESPACE ── */
@@ -1623,55 +1691,20 @@
     splash.classList.add('gone');
     setTimeout(() => splash.remove(), 400);
     showUI();
-    
-    UI.syncMinimize();
-    setInterval(() => UI.syncMinimize(), 350);
 
-    const ribbonElem = document.getElementById('ribbon');
-    if (ribbonElem) {
-      ribbonElem.addEventListener('touchstart', (e) => {
-        e.stopPropagation();
-        ribbonElem.classList.add('expanded-touch');
-      }, { passive: true });
-
-      ribbonElem.addEventListener('click', (e) => {
-        e.stopPropagation();
-        ribbonElem.classList.add('expanded-touch');
-      });
-      
-      ribbonElem.addEventListener('mouseenter', () => {
-        ribbonElem.classList.remove('minimized');
-      });
-    }
-
-    document.addEventListener('touchstart', (e) => {
-      if (ribbonElem && !ribbonElem.contains(e.target)) {
-        ribbonElem.classList.remove('expanded-touch');
-      }
-    }, { passive: true });
-
-    document.addEventListener('click', (e) => {
-      if (ribbonElem && !ribbonElem.contains(e.target)) {
-        ribbonElem.classList.remove('expanded-touch');
-      }
-    });
+    // Layers tab open by default so the panel isn't blank on first open
+    document.getElementById('cat-layers')?.classList.add('open');
 
     window.onBackPressed = function() {
-      const openSubgroup = document.querySelector('.sub-group.open');
-      if (openSubgroup) {
-        UI.expand(null);
-        return true; 
-      }
-
-      if (ribbonElem && ribbonElem.classList.contains('expanded-touch')) {
-        ribbonElem.classList.remove('expanded-touch');
-        return true; 
+      const panel = document.getElementById('sidePanel');
+      if (panel && panel.classList.contains('open')) {
+        UI.toggleMenu(false);
+        return true;
       }
 
       if (map.pm && map.pm.GlobalDrawMode) {
         map.pm.disableDraw();
         State.drawing = false;
-        UI.syncMinimize();
         return true; 
       }
 
