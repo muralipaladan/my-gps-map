@@ -17,14 +17,13 @@
     document.body.classList.add('show-ui');
     clearTimeout(uiTimer);
     uiTimer = setTimeout(() => {
-      // Hide if no critical tools are actively in use
       if (!State.drawing && !State.touchMove && !State.eraseMode && !State.editMode && !State.routeMode) {
         document.body.classList.remove('show-ui');
-        // Collapse open menus automatically
         document.querySelectorAll('.menu-sub').forEach(el => el.classList.remove('open'));
         document.querySelectorAll('.menu-cat').forEach(el => el.classList.remove('active'));
+        document.getElementById('exportMenu').classList.remove('active');
       }
-    }, 5000); // 5 seconds idle time
+    }, 5000); 
   };
 
   document.addEventListener('mousemove', showUI);
@@ -63,7 +62,13 @@
     osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:22 })
   };
 
-  map.pm.setGlobalOptions({ snappable:true, snapDistance:25, snapMiddle:true, layerGroup:map, hintMarkerStyle: { opacity: 0, fillOpacity: 0 }, templineStyle: { color: '#FF9933' } });
+  // TOOLTIPS DISABLED IN LEAFLET GEOMAN
+  map.pm.setGlobalOptions({ 
+    tooltips: false, // <-- This removes the guide text near mouse
+    snappable:true, snapDistance:25, snapMiddle:true, layerGroup:map, 
+    hintMarkerStyle: { opacity: 0, fillOpacity: 0 }, templineStyle: { color: '#FF9933' } 
+  });
+  
   map.createPane('cadastralPane'); Object.assign(map.getPane('cadastralPane').style, { zIndex:'600', pointerEvents:'none' });
 
   const WMS_BASE = { format:'image/png', transparent:true, maxZoom:22, tileSize:512, zoomOffset:-1, pane:'cadastralPane', className:'parcel-red' };
@@ -89,13 +94,13 @@
 
   const UI = {
     toggleCat(id) {
-      showUI(); // Reset hide timer on click
+      showUI(); 
       const sub = document.getElementById('sub-'+id);
       const cat = document.getElementById('cat-'+id);
       const isOpen = sub.classList.contains('open');
       
       document.querySelectorAll('.menu-sub').forEach(el => el.classList.remove('open'));
-      document.querySelectorAll('.menu-cat').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.menu-cat').forEach(el => { if(el.id.startsWith('cat-')) el.classList.remove('active') });
       
       if (!isOpen) { sub.classList.add('open'); cat.classList.add('active'); }
     }
@@ -310,7 +315,6 @@
       updateStatus(); showUI();
     };
 
-    // TOUCH AND MOUSE EVENTS FOR FMB
     const mc = map.getContainer();
     mc.addEventListener('touchstart', e => {
       if (!State.touchMove || !overlay) return; e.preventDefault(); showUI();
@@ -344,15 +348,104 @@
     return { adjust, remove, toggleTouch, getGeoRef: () => overlay ? { lat, lng, w, h, angle } : null, getImageData: () => overlay ? imgData : null };
   })();
 
+  /* ── KMZ IO LOGIC ── */
   const IO = (() => {
-    return { exportKML: () => { Toast.show('KML Download mapping enabled.', 'info'); } };
+    const dataURLtoBlob = (dataURL) => {
+      const arr = dataURL.split(','); const mime = arr[0].match(/:(.*?);/)[1]; const bstr = atob(arr[1]);
+      let n = bstr.length; const u8arr = new Uint8Array(n);
+      while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+      return new Blob([u8arr], {type:mime});
+    };
+
+    const buildTracedKmlBody = () => {
+      let body = '';
+      drawnItems.eachLayer(l => {
+        const isPolygon = l instanceof L.Polygon; 
+        const rawLlngs = l.getLatLngs ? l.getLatLngs() : null; 
+        const pts = rawLlngs ? (Array.isArray(rawLlngs[0]) ? rawLlngs[0] : rawLlngs) : [l.getLatLng()];
+        if (isPolygon) {
+          const ring = [...pts, pts[0]]; 
+          body += '<Placemark><Style><PolyStyle><color>803399FF</color><fill>1</fill><outline>1</outline></PolyStyle><LineStyle><color>ff3399FF</color><width>2</width></LineStyle></Style><Polygon><outerBoundaryIs><LinearRing><coordinates>';
+          ring.forEach(p => body += `${p.lng},${p.lat},0 `); 
+          body += '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>';
+        } else {
+          body += '<Placemark><Style><LineStyle><color>ff3399FF</color><width>2</width></LineStyle></Style><LineString><coordinates>';
+          pts.forEach(p => body += `${p.lng},${p.lat},0 `); 
+          body += '</coordinates></LineString></Placemark>';
+        }
+      }); 
+      return body;
+    };
+
+    const uploadFile = async (file) => {
+      try {
+        if (file.name.toLowerCase().endsWith('.kmz')) {
+          Toast.show('Loading KMZ...', 'info');
+          const zip = await JSZip.loadAsync(file);
+          let kmlFile = null;
+          for (let relativePath in zip.files) {
+            if (relativePath.toLowerCase().endsWith('.kml')) { kmlFile = zip.files[relativePath]; break; }
+          }
+          if (kmlFile) {
+            const kmlText = await kmlFile.async('text');
+            const k = omnivore.kml.parse(kmlText).addTo(map);
+            k.on('ready', () => { map.fitBounds(k.getBounds()); Toast.show('KMZ Loaded', 'ok'); });
+          } else { Toast.show('No KML found inside KMZ', 'warn'); }
+        } else if (file.name.toLowerCase().endsWith('.kml')) {
+          const reader = new FileReader();
+          reader.onload = ev => {
+            const k = omnivore.kml.parse(ev.target.result).addTo(map);
+            k.on('ready', () => { map.fitBounds(k.getBounds()); Toast.show('KML Loaded', 'ok'); });
+          };
+          reader.readAsText(file);
+        } else {
+          const reader = new FileReader();
+          reader.onload = ev => {
+            const j = L.geoJSON(JSON.parse(ev.target.result)).addTo(map);
+            map.fitBounds(j.getBounds()); Toast.show('JSON Loaded', 'ok');
+          };
+          reader.readAsText(file);
+        }
+      } catch (err) { Toast.show('Error loading file', 'error'); }
+    };
+
+    return { 
+      exportKMZ: async () => {
+        Toast.show('Creating KMZ...', 'info');
+        const fmbRef = FMB.getGeoRef(), imgData = FMB.getImageData(); 
+        let kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Sodestus Project</name>`;
+        const zip = new JSZip();
+
+        if (fmbRef && imgData) {
+          const imgBlob = dataURLtoBlob(imgData); const { lat, lng, w, h, angle } = fmbRef;
+          const south = lat-h/2, north = lat+h/2, west = lng-w/2, east = lng+w/2;
+          kml += `<GroundOverlay><name>FMB GeoReference</name><Icon><href>files/fmb.png</href></Icon><LatLonBox><north>${north.toFixed(8)}</north><south>${south.toFixed(8)}</south><east>${east.toFixed(8)}</east><west>${west.toFixed(8)}</west><rotation>${(-angle).toFixed(4)}</rotation></LatLonBox></GroundOverlay>`;
+          zip.file('files/fmb.png', imgBlob);
+        }
+        
+        kml += buildTracedKmlBody() + '</Document></kml>';
+        zip.file('doc.kml', kml);
+
+        try { 
+          const content = await zip.generateAsync({ type: 'blob' }); 
+          const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(content), download: 'Sodestus_Export.kmz' }); 
+          a.click(); Toast.show('KMZ exported', 'ok'); 
+        } catch (err) { Toast.show('Export Error', 'error'); }
+      },
+      uploadFile 
+    };
   })();
 
-  // Click on Map Logic for Navigation
+  // Attach listener to file input
+  document.getElementById('uploadFile').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) { GIS.IO.uploadFile(file); e.target.value = ''; document.getElementById('exportMenu').classList.remove('active'); }
+  });
+
   map.on('click', e => { 
     if (State.routeMode) {
       GIS.Draw.navigateExternal(e.latlng.lat, e.latlng.lng);
-      GIS.Draw.toggleRouteMode(); // Turn off route mode after clicking
+      GIS.Draw.toggleRouteMode();
     } 
   });
 

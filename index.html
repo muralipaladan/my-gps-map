@@ -78,11 +78,11 @@
     <button class="mb" id="routeModeBtn" onclick="GIS.Draw.toggleRouteMode()"><i class="fa-solid fa-location-arrow"></i></button>
   </div>
 
-  <div style="flex-grow: 1;"></div> <!-- Spacer -->
+  <div style="flex-grow: 1;"></div>
 
   <!-- Fixed Bottom Actions -->
   <button class="menu-cat" id="gpsBtn" onclick="GIS.GPS.toggle()"><i class="fa-solid fa-crosshairs"></i></button>
-  <button class="menu-cat" onclick="GIS.IO.exportKML()"><i class="fa-solid fa-floppy-disk"></i></button>
+  <button class="menu-cat" onclick="document.getElementById('exportMenu').classList.toggle('active')"><i class="fa-solid fa-floppy-disk"></i></button>
 
 </div>
 
@@ -96,6 +96,15 @@
   <button id="searchToggleBtn" onclick="document.getElementById('searchBar').classList.remove('collapsed')"><i class="fa-solid fa-magnifying-glass"></i></button>
   <input type="text" id="searchInput" placeholder="Search..." autocomplete="off" />
   <button id="searchBtn"><i class="fa-solid fa-arrow-right"></i></button>
+</div>
+
+<!-- Export/Save Popup menu -->
+<div class="export-menu" id="exportMenu">
+  <button class="btn btn-export" onclick="GIS.IO.exportKMZ(); document.getElementById('exportMenu').classList.remove('active');"><i class="fa-solid fa-file-zipper"></i> Save KMZ</button>
+  <label class="btn btn-import" style="margin-top:4px; justify-content:center;">
+    <i class="fa-solid fa-file-import"></i> Load KML / KMZ
+    <input type="file" id="uploadFile" accept=".kml,.kmz,.json,.geojson" style="display:none" />
+  </label>
 </div>
 
 <div id="toast-root"></div>
@@ -115,6 +124,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script src="https://unpkg.com/@mapbox/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
 <script src="script.js"></script>
 
