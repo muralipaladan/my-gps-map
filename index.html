@@ -12,7 +12,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
-  <!-- External Stylesheet -->
   <link rel="stylesheet" href="style.css" />
 </head>
 
@@ -21,10 +20,123 @@
 <div id="splash">
   <p class="splash-logo">Sodestus <span>GIS</span></p>
   <div class="spin-ring"></div>
-  <p class="splash-sub">Loading Mobile Engine…</p>
 </div>
 
-<!-- Status Ribbon -->
+<!-- Top Narrow Ribbon -->
+<div class="top-bar">
+  <div class="top-bar-left">
+    <button class="top-btn" onclick="GIS.UI.toggleMenu()"><i class="fa-solid fa-bars"></i></button>
+    <span class="top-title">Sodestus</span>
+  </div>
+  <div class="top-bar-right">
+    <button class="top-btn" onclick="document.getElementById('searchBar').classList.toggle('collapsed')"><i class="fa-solid fa-magnifying-glass"></i></button>
+    <button class="top-btn" id="gpsBtn" onclick="GIS.GPS.toggle()"><i class="fa-solid fa-crosshairs"></i></button>
+    <button class="top-btn" onclick="document.getElementById('exportMenu').classList.toggle('active')"><i class="fa-solid fa-floppy-disk"></i></button>
+  </div>
+</div>
+
+<!-- Scroll Down Dropdown Menu -->
+<div class="dropdown-menu" id="dropdownMenu">
+  
+  <!-- Layers -->
+  <div class="menu-item">
+    <button class="menu-head" onclick="GIS.UI.toggleCat('layers')">
+      <span><i class="fa-solid fa-layer-group"></i> Layers</span>
+      <i class="fa-solid fa-chevron-down" id="icon-layers"></i>
+    </button>
+    <div class="menu-body" id="body-layers" style="display:none;">
+      <div class="cat-hint">Basemap</div>
+      <div class="mb-row">
+        <button class="mb" title="Hybrid" onclick="GIS.Layers.setBase('hybrid')">HYB</button>
+        <button class="mb" title="Road" onclick="GIS.Layers.setBase('road')">ROAD</button>
+        <button class="mb" title="OpenStreetMap" onclick="GIS.Layers.setBase('osm')">OSM</button>
+      </div>
+      <div class="cat-divider"></div>
+      <div class="cat-hint">Cadastral WMS</div>
+      <div class="mb-row">
+        <button class="mb" id="btnVil" onclick="GIS.Layers.toggleWms('village')">Village</button>
+        <button class="mb" id="btnCad" onclick="GIS.Layers.toggleWms('cadastral')">Cadastral</button>
+      </div>
+      <div class="cat-divider"></div>
+      <div class="cat-hint">KSUDP Parcels</div>
+      <div class="mb-row" style="flex-wrap: wrap;">
+        <button class="mb" id="btnKCH" onclick="GIS.Layers.toggleWms('parcelKCH')">Kochi</button>
+        <button class="mb" id="btnKKD" onclick="GIS.Layers.toggleWms('parcelKKD')">Kozhikode</button>
+        <button class="mb" id="btnKLM" onclick="GIS.Layers.toggleWms('parcelKLM')">Kollam</button>
+        <button class="mb" id="btnTCR" onclick="GIS.Layers.toggleWms('parcelTCR')">Thrissur</button>
+        <button class="mb" id="btnTVM" onclick="GIS.Layers.toggleWms('parcelTVM')">Tvm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drawing Tools -->
+  <div class="menu-item">
+    <button class="menu-head" onclick="GIS.UI.toggleCat('draw')">
+      <span><i class="fa-solid fa-pen-ruler"></i> Drawing Tools</span>
+      <i class="fa-solid fa-chevron-down" id="icon-draw"></i>
+    </button>
+    <div class="menu-body" id="body-draw" style="display:none;">
+      <button class="tool-list-btn" id="markerBtn" onclick="GIS.Draw.trigger('Marker')"><i class="fa-solid fa-location-dot"></i> Save Note (Pin)</button>
+      <button class="tool-list-btn" id="lineBtn" onclick="GIS.Draw.trigger('Line')"><i class="fa-solid fa-file-signature"></i> Draw Line</button>
+      <button class="tool-list-btn" id="polygonBtn" onclick="GIS.Draw.trigger('Polygon')"><i class="fa-solid fa-draw-polygon"></i> Draw Polygon</button>
+      <div class="cat-divider"></div>
+      <button class="tool-list-btn" id="editBtn" onclick="GIS.Draw.toggleEdit()"><i class="fa-solid fa-pen-to-square"></i> Edit Shapes</button>
+      <button class="tool-list-btn" id="eraseModeBtn" onclick="GIS.Draw.toggleErase()"><i class="fa-solid fa-eraser"></i> Erase Shape</button>
+      <button class="tool-list-btn" onclick="GIS.Draw.clearAll()" style="color:var(--red)"><i class="fa-solid fa-trash-can"></i> Clear All</button>
+    </div>
+  </div>
+
+  <!-- Georeference -->
+  <div class="menu-item">
+    <button class="menu-head" onclick="GIS.UI.toggleCat('georef')">
+      <span><i class="fa-solid fa-map-location-dot"></i> Georeference</span>
+      <i class="fa-solid fa-chevron-down" id="icon-georef"></i>
+    </button>
+    <div class="menu-body" id="body-georef" style="display:none;">
+      <label class="tool-list-btn" style="background:var(--green);color:#fff;text-align:center;justify-content:center;">
+        <i class="fa-solid fa-image"></i> Load FMB Image / PDF
+        <input type="file" id="uploadFMB" accept=".jpg,.jpeg,.png,.pdf" style="display:none" />
+      </label>
+      
+      <div id="fmbTools" style="display:none; flex-direction:column; gap:8px; margin-top:8px;">
+        <button class="tool-list-btn" id="touchMoveBtn" onclick="GIS.FMB.toggleTouch()" style="justify-content:center; border:1px solid var(--accent);"><i class="fa-solid fa-hand-pointer"></i> Touch to Move FMB</button>
+        
+        <div style="display:flex; gap:10px; width:100%;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; background:var(--surface-2); padding:6px; border-radius:var(--r-sm);">
+            <span class="cat-hint">Nudge Move</span>
+            <button class="mb" onclick="GIS.FMB.adjust('up')">↑</button>
+            <div class="mb-row" style="justify-content:center;"><button class="mb" onclick="GIS.FMB.adjust('left')">←</button><button class="mb" onclick="GIS.FMB.adjust('right')">→</button></div>
+            <button class="mb" onclick="GIS.FMB.adjust('down')">↓</button>
+          </div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; background:var(--surface-2); padding:6px; border-radius:var(--r-sm);">
+            <span class="cat-hint">Scale & Rotate</span>
+            <div class="mb-row" style="justify-content:center; margin-bottom:4px;"><button class="mb" onclick="GIS.FMB.adjust('zoomin')"><i class="fa-solid fa-plus"></i></button><button class="mb" onclick="GIS.FMB.adjust('zoomout')"><i class="fa-solid fa-minus"></i></button></div>
+            <div class="mb-row" style="justify-content:center;"><button class="mb" onclick="GIS.FMB.adjust('rotL')"><i class="fa-solid fa-rotate-left"></i></button><button class="mb" onclick="GIS.FMB.adjust('rotR')"><i class="fa-solid fa-rotate-right"></i></button></div>
+          </div>
+        </div>
+
+        <span class="cat-hint" style="margin-top:4px;">Opacity</span>
+        <input type="range" id="fmbOpacity" class="vslider" min="0.1" max="1" step="0.05" value="0.6" style="width:100%;" />
+        
+        <button class="tool-list-btn" onclick="GIS.FMB.remove()" style="background:rgba(220,38,38,.14);color:var(--red);justify-content:center;margin-top:6px;"><i class="fa-solid fa-trash"></i> Remove FMB</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <div class="menu-item">
+    <button class="menu-head" onclick="GIS.UI.toggleCat('nav')">
+      <span><i class="fa-solid fa-route"></i> Navigation</span>
+      <i class="fa-solid fa-chevron-down" id="icon-nav"></i>
+    </button>
+    <div class="menu-body" id="body-nav" style="display:none;">
+      <span class="cat-hint">Tap a point on the map to route from your location.</span>
+      <button class="tool-list-btn" id="routeModeBtn" onclick="GIS.Draw.toggleRouteMode()" style="justify-content:center;"><i class="fa-solid fa-route"></i> Start Routing Planner</button>
+    </div>
+  </div>
+</div>
+
+<!-- Status Ribbon (Moved below Top Bar) -->
 <div id="statusRibbon" class="status-ribbon">
   <div class="indicator" id="ribbonIndicator"></div>
   <span id="ribbonText">Hybrid</span>
@@ -34,127 +146,15 @@
 <div id="zoomBox"></div>
 
 <div class="searchbar collapsed" id="searchBar">
-  <button id="searchToggleBtn" title="Search"><i class="fa-solid fa-magnifying-glass"></i></button>
   <input type="text" id="searchInput" placeholder="Search place or lat, lng…" autocomplete="off" />
-  <span id="searchPhoneInfo" style="display:flex;align-items:center;gap:5px;flex-shrink:0;padding:0 4px;border-left:1px solid var(--border);margin-left:2px;">
-    <i class="fa-solid fa-phone" style="color:var(--accent);font-size:11px;"></i>
-    <span style="font-family:var(--mono);font-size:10px;color:var(--accent);font-weight:500;white-space:nowrap;">9400849115</span>
-  </span>
   <button id="searchBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
-</div>
-
-<!-- Top Left Dock for GPS -->
-<div class="top-dock">
-  <button class="rb" id="gpsBtn" data-tip="Live GPS" onclick="GIS.GPS.toggle()"><i class="fa-solid fa-crosshairs"></i></button>
-</div>
-
-<!-- Floating Tool Panel (Replaces the wide side panel) -->
-<div class="tool-panel" id="toolPanel">
-  <div class="tool-panel-header" id="toolPanelTitle">Tools</div>
-  <button class="panel-close-btn" onclick="GIS.UI.closeMenu()"><i class="fa-solid fa-xmark"></i></button>
-
-  <!-- Layers Content -->
-  <div class="tool-content" id="content-layers" style="display:none;">
-    <div class="cat-hint">Basemap</div>
-    <div class="mb-row">
-      <button class="mb" title="Hybrid" onclick="GIS.Layers.setBase('hybrid')" style="font-size:9px;font-weight:800;">HYB</button>
-      <button class="mb" title="Road" onclick="GIS.Layers.setBase('road')" style="font-size:9px;font-weight:800;">ROAD</button>
-      <button class="mb" title="OpenStreetMap" onclick="GIS.Layers.setBase('osm')" style="font-size:9px;font-weight:800;">OSM</button>
-    </div>
-    <div class="cat-divider"></div>
-    <div class="cat-hint">Cadastral WMS</div>
-    <div class="mb-row">
-      <button class="mb" id="btnVil" title="Village WMS" onclick="GIS.Layers.toggleWms('village')" style="font-size:9px;font-weight:800">VIL</button>
-      <button class="mb" id="btnCad" title="Cadastral WMS" onclick="GIS.Layers.toggleWms('cadastral')" style="font-size:9px;font-weight:800">CAD</button>
-    </div>
-    <div class="cat-divider"></div>
-    <div class="cat-hint">KSUDP Survey Parcel</div>
-    <div class="mb-row" style="flex-wrap: wrap;">
-      <button class="mb" id="btnKCH" title="Kochi" onclick="GIS.Layers.toggleWms('parcelKCH')" style="font-size:9px;font-weight:800">KCH</button>
-      <button class="mb" id="btnKKD" title="Kozhikode" onclick="GIS.Layers.toggleWms('parcelKKD')" style="font-size:9px;font-weight:800">KKD</button>
-      <button class="mb" id="btnKLM" title="Kollam" onclick="GIS.Layers.toggleWms('parcelKLM')" style="font-size:9px;font-weight:800">KLM</button>
-      <button class="mb" id="btnTCR" title="Thrissur" onclick="GIS.Layers.toggleWms('parcelTCR')" style="font-size:9px;font-weight:800">TCR</button>
-      <button class="mb" id="btnTVM" title="Trivandrum" onclick="GIS.Layers.toggleWms('parcelTVM')" style="font-size:9px;font-weight:800">TVM</button>
-    </div>
-  </div>
-
-  <!-- Draw Content -->
-  <div class="tool-content" id="content-draw" style="display:none;">
-    <div class="mb-row" style="justify-content: center; flex-wrap: wrap; gap: 8px;">
-      <button class="mb tool-lg" id="markerBtn" title="Save Note" onclick="GIS.Draw.trigger('Marker')"><i class="fa-solid fa-location-dot"></i></button>
-      <button class="mb tool-lg" id="lineBtn" title="Draw Line" onclick="GIS.Draw.trigger('Line')"><i class="fa-solid fa-file-signature"></i></button>
-      <button class="mb tool-lg" id="polygonBtn" title="Draw Polygon" onclick="GIS.Draw.trigger('Polygon')"><i class="fa-solid fa-draw-polygon"></i></button>
-      <div class="cat-divider"></div>
-      <button class="mb tool-lg" id="editBtn" title="Edit Shapes" onclick="GIS.Draw.toggleEdit()"><i class="fa-solid fa-pen-to-square"></i></button>
-      <button class="mb tool-lg" id="eraseModeBtn" title="Erase" onclick="GIS.Draw.toggleErase()"><i class="fa-solid fa-eraser"></i></button>
-      <button class="mb tool-lg" title="Clear All" onclick="GIS.Draw.clearAll()" style="color:var(--red)"><i class="fa-solid fa-trash-can"></i></button>
-    </div>
-  </div>
-
-  <!-- Georef Content -->
-  <div class="tool-content" id="content-georef" style="display:none;">
-    <label class="mb cat-full" id="fmbLoadLabel" title="Load FMB" style="width:100%;height:36px;gap:6px;font-size:11px;font-weight:700;background:var(--green);color:#fff;">
-      <i class="fa-solid fa-image"></i> Load FMB Image/PDF
-      <input type="file" id="uploadFMB" accept=".jpg,.jpeg,.png,.pdf" style="display:none" />
-    </label>
-
-    <div id="fmbTools" style="display:none;flex-wrap:wrap;gap:6px;width:100%;margin-top:10px;">
-      <button class="mb cat-full" id="touchMoveBtn" title="Touch Move FMB" onclick="GIS.FMB.toggleTouch()" style="width:100%;height:36px;gap:6px;font-size:11px;font-weight:700"><i class="fa-solid fa-hand-pointer"></i> Touch Move</button>
-      <div class="cat-divider"></div>
-      
-      <div class="mb-row" style="justify-content:space-between; width:100%">
-        <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-            <div class="cat-hint">Nudge</div>
-            <button class="mb" onclick="GIS.FMB.adjust('up')">↑</button>
-            <div class="mb-row"><button class="mb" onclick="GIS.FMB.adjust('left')">←</button><button class="mb" onclick="GIS.FMB.adjust('right')">→</button></div>
-            <button class="mb" onclick="GIS.FMB.adjust('down')">↓</button>
-        </div>
-        <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-            <div class="cat-hint">Scale/Rot</div>
-            <div class="mb-row"><button class="mb" onclick="GIS.FMB.adjust('zoomin')"><i class="fa-solid fa-plus"></i></button><button class="mb" onclick="GIS.FMB.adjust('zoomout')"><i class="fa-solid fa-minus"></i></button></div>
-            <div class="mb-row"><button class="mb" onclick="GIS.FMB.adjust('rotL')"><i class="fa-solid fa-rotate-left"></i></button><button class="mb" onclick="GIS.FMB.adjust('rotR')"><i class="fa-solid fa-rotate-right"></i></button></div>
-        </div>
-      </div>
-      
-      <div class="cat-hint" style="margin-top:6px;">Opacity</div>
-      <input type="range" id="fmbOpacity" class="vslider" min="0.1" max="1" step="0.05" value="0.6" style="width:100%; margin-bottom:6px;" />
-      
-      <button class="mb cat-full" title="Remove FMB" onclick="GIS.FMB.remove()" style="width:100%;gap:6px;font-size:11px;font-weight:700;background:rgba(220,38,38,.14);color:var(--red)"><i class="fa-solid fa-trash"></i> Remove</button>
-    </div>
-  </div>
-
-  <!-- Nav Content -->
-  <div class="tool-content" id="content-nav" style="display:none;">
-    <div class="cat-hint">Tap a point on the map, or a saved note's Navigate button, to route from your live location.</div>
-    <button class="mb cat-full" id="routeModeBtn" title="Route Planner" onclick="GIS.Draw.toggleRouteMode()" style="width:100%;height:40px;gap:8px;font-size:12px;font-weight:700; margin-top:8px;"><i class="fa-solid fa-route"></i> Start Routing</button>
-  </div>
-</div>
-
-<!-- Mobile Bottom Dock (Navigation Bar) -->
-<div class="bottom-dock hud">
-  <button class="nav-tab" id="nav-layers" onclick="GIS.UI.openTab('layers', 'Map Layers')">
-    <i class="fa-solid fa-layer-group"></i>
-  </button>
-  <button class="nav-tab" id="nav-draw" onclick="GIS.UI.openTab('draw', 'Drawing Tools')">
-    <i class="fa-solid fa-pen-ruler"></i>
-  </button>
-  <button class="nav-tab" id="nav-georef" onclick="GIS.UI.openTab('georef', 'Georeference')">
-    <i class="fa-solid fa-map-location-dot"></i>
-  </button>
-  <button class="nav-tab" id="nav-nav" onclick="GIS.UI.openTab('nav', 'Navigation')">
-    <i class="fa-solid fa-route"></i>
-  </button>
-  <div class="dock-divider"></div>
-  <button class="nav-tab action-btn" onclick="document.getElementById('exportMenu').classList.toggle('active')">
-    <i class="fa-solid fa-floppy-disk"></i>
-  </button>
 </div>
 
 <!-- Export/Save Popup menu -->
 <div class="export-menu" id="exportMenu">
-  <button class="btn btn-export" onclick="GIS.IO.exportKML(); document.getElementById('exportMenu').classList.remove('active');"><i class="fa-solid fa-file-export"></i> KML</button>
-  <button class="btn btn-export" onclick="GIS.IO.exportKMZ(); document.getElementById('exportMenu').classList.remove('active');"><i class="fa-solid fa-file-zipper"></i> KMZ</button>
-  <button class="btn btn-export" onclick="GIS.IO.exportGeoImage(); document.getElementById('exportMenu').classList.remove('active');"><i class="fa-solid fa-image"></i> Geo-JPEG</button>
+  <button class="btn btn-export" onclick="GIS.IO.exportKML(); document.getElementById('exportMenu').classList.remove('active');"><i class="fa-solid fa-file-export"></i> Save KML</button>
+  <button class="btn btn-export" onclick="GIS.IO.exportKMZ(); document.getElementById('exportMenu').classList.remove('active');"><i class="fa-solid fa-file-zipper"></i> Save KMZ</button>
+  <button class="btn btn-export" onclick="GIS.IO.exportGeoImage(); document.getElementById('exportMenu').classList.remove('active');"><i class="fa-solid fa-image"></i> Save Geo-JPEG</button>
   <label class="btn btn-import" style="margin-top:4px; justify-content:center;">
     <i class="fa-solid fa-file-import"></i> Load KML
     <input type="file" id="uploadFile" accept=".kml,.json,.geojson" style="display:none" />
@@ -162,7 +162,6 @@
 </div>
 
 <div id="toast-root"></div>
-
 <div class="modal-backdrop" id="modalBackdrop">
   <div class="modal">
     <div class="modal-title" id="modalTitle">Confirm</div>
@@ -181,8 +180,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
-
-<!-- External Script -->
 <script src="script.js"></script>
 </body>
 </html>
