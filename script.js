@@ -63,9 +63,9 @@
   L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'Kerala:Cadastry_Kerala' }).addTo(mini);
 
   const drawnItems = new L.FeatureGroup().addTo(map), drawnItemsMini = new L.FeatureGroup().addTo(mini);
-  const vectorSync = {}; let routeLayer = null, routeLayerMini = null;
+  const vectorSync = {};
 
-  /* ── UI MODULE (Vertical Sidebar Accordion) ── */
+  /* ── UI MODULE ── */
   const UI = {
     toggleCat(id) {
       const sub = document.getElementById('sub-'+id);
@@ -150,7 +150,8 @@
     const renderNotes = () => {
       pinGroup.clearLayers(); pinGroupMini.clearLayers();
       savedNotes.forEach((p, i) => {
-        L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(`<b>📍 Note</b><br>${p.text}<button class="p-nav" style="background:var(--blue);" onclick="GIS.Draw.drawShortestRoute(${p.lat}, ${p.lng})">Route</button><button class="p-del" onclick="GIS.Draw._deleteNote(${i})">Delete</button>`);
+        // ഇവിടുത്തെ നാവിഗേഷൻ ബട്ടൺ നേരിട്ട് ഗൂഗിൾ മാപ്പ് തുറക്കാൻ സെറ്റ് ചെയ്തു
+        L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(`<b>📍 Note</b><br>${p.text}<button class="p-nav" style="background:#0b8043;" onclick="GIS.Draw.navigateExternal(${p.lat}, ${p.lng})">Open in Maps</button><button class="p-del" onclick="GIS.Draw._deleteNote(${i})">Delete</button>`);
         L.marker([p.lat, p.lng]).addTo(pinGroupMini);
       });
     }; renderNotes();
@@ -219,31 +220,23 @@
       const ok = await Modal.confirm('Clear all drawings?'); if (!ok) return;
       drawnItems.clearLayers(); drawnItemsMini.clearLayers(); Object.keys(vectorSync).forEach(k => delete vectorSync[k]);
       map.eachLayer(l => { if (l.pm && l instanceof L.Path) map.removeLayer(l); });
-      if (State.eraseMode) toggleErase(); if (State.editMode) toggleEdit(); if (routeLayerMini) mini.removeLayer(routeLayerMini);
+      if (State.eraseMode) toggleErase(); if (State.editMode) toggleEdit();
       Toast.show('Cleared', 'ok');
     };
 
     const toggleRouteMode = () => {
       if (map.pm.GlobalDrawMode) map.pm.disableDraw(); if (State.editMode) toggleEdit(); if (State.eraseMode) toggleErase();
       State.routeMode = !State.routeMode; const btn = document.getElementById('routeModeBtn');
-      if (State.routeMode) { btn.classList.add('on-accent'); State.activeTool='ROUTE'; Toast.show('Tap map to route', 'info'); } 
-      else { btn.classList.remove('on-accent'); State.activeTool=null; if (routeLayer) map.removeLayer(routeLayer); if (routeLayerMini) mini.removeLayer(routeLayerMini); }
+      if (State.routeMode) { btn.classList.add('on-accent'); State.activeTool='NAVIGATE'; Toast.show('Tap map to open Google Maps', 'info'); } 
+      else { btn.classList.remove('on-accent'); State.activeTool=null; }
       updateStatus();
     };
 
-    const drawShortestRoute = async (destLat, destLng) => {
-      if (routeLayer) map.removeLayer(routeLayer); if (routeLayerMini) mini.removeLayer(routeLayerMini);
-      let startLoc = State.userLatLng; if (!startLoc) { if (!document.getElementById('gpsBtn').classList.contains('on-blue')) GPS.toggle(); startLoc = map.getCenter(); }
-      try {
-        const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${startLoc.lng},${startLoc.lat};${destLng},${destLat}?overview=full&geometries=geojson`);
-        const data = await res.json(); const route = data.routes[0]; const coordinates = route.geometry.coordinates.map(c => [c[1], c[0]]);
-        const mkRoute = () => L.featureGroup([ L.polyline(coordinates, { color:'#ffffff', weight:7 }), L.polyline(coordinates, { color:'#1d4ed8', weight:4 }) ]);
-        routeLayer = mkRoute().addTo(map); routeLayerMini = mkRoute().addTo(mini); map.fitBounds(routeLayer.getBounds(), { padding:[50,50] });
-        Toast.show(`${(route.distance/1000).toFixed(2)} km · ${Math.round(route.duration/60)} mins`, 'ok');
-      } catch (err) { Toast.show('Routing failed', 'error'); }
+    const navigateExternal = (lat, lng) => {
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`, '_blank');
     };
 
-    return { trigger, toggleErase, toggleEdit, clearAll, _deleteNote: i => { savedNotes.splice(i, 1); localStorage.setItem(STORAGE_KEY, JSON.stringify(savedNotes)); renderNotes(); }, toggleRouteMode, drawShortestRoute };
+    return { trigger, toggleErase, toggleEdit, clearAll, _deleteNote: i => { savedNotes.splice(i, 1); localStorage.setItem(STORAGE_KEY, JSON.stringify(savedNotes)); renderNotes(); }, toggleRouteMode, navigateExternal };
   })();
 
   const FMB = (() => {
@@ -295,6 +288,7 @@
       updateStatus();
     };
 
+    // TOUCH AND MOUSE EVENTS FOR FMB
     const mc = map.getContainer();
     mc.addEventListener('touchstart', e => {
       if (!State.touchMove || !overlay) return; e.preventDefault();
@@ -318,19 +312,28 @@
       } render();
     }, { passive:false });
     mc.addEventListener('touchend', () => { touchStart = null; pinchDist = 0; }, { passive:false });
+
+    let mouseStart = null;
+    mc.addEventListener('mousedown', e => { if (!State.touchMove || !overlay || e.button!==0) return; e.preventDefault(); mouseStart = { x:e.clientX, y:e.clientY }; startLat = lat; startLng = lng; });
+    document.addEventListener('mousemove', e => { if (!State.touchMove || !overlay || !mouseStart) return; e.preventDefault(); const p = map.latLngToContainerPoint([startLat, startLng]); const nl = map.containerPointToLatLng(L.point(p.x+(e.clientX-mouseStart.x), p.y+(e.clientY-mouseStart.y))); lat = nl.lat; lng = nl.lng; render(); });
+    document.addEventListener('mouseup', () => mouseStart = null);
+    mc.addEventListener('wheel', e => { if (!State.touchMove || !overlay) return; e.preventDefault(); if (e.deltaY < 0) { w*=1.03; h*=1.03; } else { w*=0.97; h*=0.97; } render(); }, { passive: false });
     
     return { adjust, remove, toggleTouch, getGeoRef: () => overlay ? { lat, lng, w, h, angle } : null, getImageData: () => overlay ? imgData : null };
   })();
 
   const IO = (() => {
-    return {
-      exportKML: () => { Toast.show('KML Download feature currently mapped to native code.', 'info'); }
-    };
+    return { exportKML: () => { Toast.show('KML Download mapped to native code.', 'info'); } };
   })();
+
+  // Click on Map Logic
+  map.on('click', e => { 
+    if (State.routeMode) {
+      GIS.Draw.navigateExternal(e.latlng.lat, e.latlng.lng);
+      GIS.Draw.toggleRouteMode(); // ഓഫ് ആകാൻ
+    } 
+  });
 
   window.GIS = { Layers, Search, GPS, Draw, FMB, UI, IO };
 
-  map.whenReady(() => {
-    document.getElementById('cat-layers').click();
-  });
 })();
