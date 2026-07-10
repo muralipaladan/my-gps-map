@@ -9,6 +9,28 @@
   const KSREC_URL     = 'https://ksrec.in/geoserver/Kerala/wms';
   const DEFAULT_VIEW  = { lat: 11.196, lng: 76.227, zoom: 16 };
 
+  const State = { drawing: false, eraseMode: false, editMode: false, touchMove: false, routeMode: false, userLatLng: null, activeLayer: 'Hybrid', activeTool: null };
+
+  /* ── Auto-hide Toolbar Logic (Scroll out when idle) ── */
+  let uiTimer = null;
+  const showUI = () => {
+    document.body.classList.add('show-ui');
+    clearTimeout(uiTimer);
+    uiTimer = setTimeout(() => {
+      // Hide if no critical tools are actively in use
+      if (!State.drawing && !State.touchMove && !State.eraseMode && !State.editMode && !State.routeMode) {
+        document.body.classList.remove('show-ui');
+        // Collapse open menus automatically
+        document.querySelectorAll('.menu-sub').forEach(el => el.classList.remove('open'));
+        document.querySelectorAll('.menu-cat').forEach(el => el.classList.remove('active'));
+      }
+    }, 5000); // 5 seconds idle time
+  };
+
+  document.addEventListener('mousemove', showUI);
+  document.addEventListener('touchstart', showUI, {passive: true});
+  document.addEventListener('keydown', showUI);
+
   const Toast = (() => {
     const root = document.getElementById('toast-root');
     const ICONS = { info:'fa-circle-info', ok:'fa-circle-check', warn:'fa-triangle-exclamation', error:'fa-circle-xmark' };
@@ -29,8 +51,6 @@
     document.getElementById('modalCancel').onclick = () => { bd.classList.remove('open'); _resolve(false); };
     return { confirm(t, b) { title.textContent = t || 'Confirm'; body.textContent = b || 'Are you sure?'; bd.classList.add('open'); return new Promise(r => _resolve = r); } };
   })();
-
-  const State = { drawing: false, eraseMode: false, editMode: false, touchMove: false, routeMode: false, userLatLng: null, activeLayer: 'Hybrid', activeTool: null };
 
   const updateStatus = () => {
     document.getElementById('statusText').textContent = State.activeTool ? State.activeTool : State.activeLayer;
@@ -56,7 +76,9 @@
     parcelTCR: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, layers:'Kerala:KSUDP_TCR_Survey_Parcel_acpc' }),
     parcelTVM: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, layers:'Kerala:KSUDP_TVM_Survey_Parcel_acpc' }),
   };
-  State.activeLayer = 'Cadastral'; updateStatus();
+  State.activeLayer = 'CAD'; updateStatus();
+
+  map.on('dragstart zoomstart', showUI);
 
   const mini = L.map('zoomBox', { attributionControl:false, zoomControl:false, dragging:false, touchZoom:false, scrollWheelZoom:false, doubleClickZoom:false, boxZoom:false, layers:[L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom:22, subdomains:['mt0','mt1','mt2','mt3'] })] });
   mini.createPane('miniCadastral'); Object.assign(mini.getPane('miniCadastral').style, { zIndex:'600', pointerEvents:'none' });
@@ -65,9 +87,9 @@
   const drawnItems = new L.FeatureGroup().addTo(map), drawnItemsMini = new L.FeatureGroup().addTo(mini);
   const vectorSync = {};
 
-  /* ── UI MODULE ── */
   const UI = {
     toggleCat(id) {
+      showUI(); // Reset hide timer on click
       const sub = document.getElementById('sub-'+id);
       const cat = document.getElementById('cat-'+id);
       const isOpen = sub.classList.contains('open');
@@ -85,7 +107,7 @@
       const titles = { hybrid: 'HYB', road: 'ROD', osm: 'OSM' };
       document.querySelectorAll('#sub-layers .mb').forEach(b => { if(['HYB','ROD','OSM'].includes(b.textContent)) b.classList.remove('on-saffron'); });
       document.querySelector(`#sub-layers button[title="${document.querySelector(`button[onclick*="'${key}'"]`).title}"]`).classList.add('on-saffron');
-      State.activeLayer = titles[key]; updateStatus(); Toast.show(`${titles[key]} Layer Active`);
+      State.activeLayer = titles[key]; updateStatus(); Toast.show(`${titles[key]} Active`);
     },
     toggleWms(type) {
       const layer = wmsLayers[type];
@@ -135,6 +157,7 @@
     const start = () => { if (navigator.geolocation) watchId = navigator.geolocation.watchPosition(onLocationUpdate, ()=>{}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); };
     const stop = () => { if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; } if (userMarker) { map.removeLayer(userMarker); map.removeLayer(ring); mini.removeLayer(userMarkerMini); mini.removeLayer(ringMini); userMarker=null; ring=null; userMarkerMini=null; ringMini=null; } };
     const toggle = () => {
+      showUI();
       const btn = document.getElementById('gpsBtn');
       if (!active) { active = true; btn.classList.add('on-blue'); start(); Toast.show('GPS Active', 'ok'); }
       else { active = false; btn.classList.remove('on-blue'); stop(); Toast.show('GPS Stopped', 'info'); }
@@ -150,8 +173,7 @@
     const renderNotes = () => {
       pinGroup.clearLayers(); pinGroupMini.clearLayers();
       savedNotes.forEach((p, i) => {
-        // ഇവിടുത്തെ നാവിഗേഷൻ ബട്ടൺ നേരിട്ട് ഗൂഗിൾ മാപ്പ് തുറക്കാൻ സെറ്റ് ചെയ്തു
-        L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(`<b>📍 Note</b><br>${p.text}<button class="p-nav" style="background:#0b8043;" onclick="GIS.Draw.navigateExternal(${p.lat}, ${p.lng})">Open in Maps</button><button class="p-del" onclick="GIS.Draw._deleteNote(${i})">Delete</button>`);
+        L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(`<b>📍 Note</b><br>${p.text}<button class="p-nav" style="background:#0b8043;" onclick="GIS.Draw.navigateExternal(${p.lat}, ${p.lng})">Navigate</button><button class="p-del" onclick="GIS.Draw._deleteNote(${i})">Delete</button>`);
         L.marker([p.lat, p.lng]).addTo(pinGroupMini);
       });
     }; renderNotes();
@@ -163,13 +185,13 @@
       const wasActive = map.pm.GlobalDrawMode === toolType; clearHighlights();
       if (wasActive) { map.pm.disableDraw(); State.activeTool=null; }
       else { map.pm.enableDraw(toolType, { hintMarkerStyle: { opacity: 0, fillOpacity: 0 } }); const id = { Line:'lineBtn', Polygon:'polygonBtn', Marker:'markerBtn' }[toolType]; document.getElementById(id).classList.add('on-accent'); State.activeTool = toolType.toUpperCase(); }
-      updateStatus();
+      updateStatus(); showUI();
     };
 
     map.on('pm:globaldrawmodetoggled', e => { if (!e.enabled) clearHighlights(); });
     let workingLayerMini = null;
     map.on('pm:drawstart', (e) => {
-      State.drawing = true;
+      State.drawing = true; showUI();
       if (e.workingLayer) {
         if (workingLayerMini) mini.removeLayer(workingLayerMini);
         const shape = map.pm.Draw.getActiveShape(), style = { color: '#FF9933', weight: 4, dashArray: '5, 5' };
@@ -206,14 +228,14 @@
       if (map.pm.GlobalDrawMode) map.pm.disableDraw(); if (State.editMode) toggleEdit(); if (State.routeMode) toggleRouteMode();
       map.pm.toggleGlobalRemovalMode(); State.eraseMode = map.pm.globalRemovalModeEnabled(); const btn = document.getElementById('eraseModeBtn');
       if (State.eraseMode) { btn.classList.add('on-accent'); State.activeTool='ERASE'; Toast.show('Tap shape to erase', 'warn'); } 
-      else { btn.classList.remove('on-accent'); State.activeTool=null; } updateStatus();
+      else { btn.classList.remove('on-accent'); State.activeTool=null; } updateStatus(); showUI();
     };
 
     const toggleEdit = () => {
       if (map.pm.GlobalDrawMode) map.pm.disableDraw(); if (State.eraseMode) toggleErase(); if (State.routeMode) toggleRouteMode();
       map.pm.toggleGlobalEditMode(); State.editMode = map.pm.globalEditModeEnabled(); const btn = document.getElementById('editBtn');
       if (State.editMode) { btn.classList.add('on-accent'); State.activeTool='EDIT'; Toast.show('Drag nodes to reshape', 'info'); } 
-      else { btn.classList.remove('on-accent'); State.activeTool=null; } updateStatus();
+      else { btn.classList.remove('on-accent'); State.activeTool=null; } updateStatus(); showUI();
     };
 
     const clearAll = async () => {
@@ -221,15 +243,15 @@
       drawnItems.clearLayers(); drawnItemsMini.clearLayers(); Object.keys(vectorSync).forEach(k => delete vectorSync[k]);
       map.eachLayer(l => { if (l.pm && l instanceof L.Path) map.removeLayer(l); });
       if (State.eraseMode) toggleErase(); if (State.editMode) toggleEdit();
-      Toast.show('Cleared', 'ok');
+      Toast.show('Cleared', 'ok'); showUI();
     };
 
     const toggleRouteMode = () => {
       if (map.pm.GlobalDrawMode) map.pm.disableDraw(); if (State.editMode) toggleEdit(); if (State.eraseMode) toggleErase();
       State.routeMode = !State.routeMode; const btn = document.getElementById('routeModeBtn');
-      if (State.routeMode) { btn.classList.add('on-accent'); State.activeTool='NAVIGATE'; Toast.show('Tap map to open Google Maps', 'info'); } 
+      if (State.routeMode) { btn.classList.add('on-accent'); State.activeTool='NAVIGATE'; Toast.show('Tap map to navigate', 'info'); } 
       else { btn.classList.remove('on-accent'); State.activeTool=null; }
-      updateStatus();
+      updateStatus(); showUI();
     };
 
     const navigateExternal = (lat, lng) => {
@@ -256,10 +278,10 @@
         } else { Toast.show('Provide JPG/PNG/PDF', 'warn'); return; }
       } catch (err) { Toast.show(`Error: ${err.message}`, 'error'); return; }
       const c = map.getCenter(); lat = c.lat; lng = c.lng; angle = 0; w = 0.0025; h = 0.0025; render();
-      document.getElementById('fmbTools').style.display = 'flex'; Toast.show('FMB loaded', 'ok');
+      document.getElementById('fmbTools').style.display = 'flex'; Toast.show('FMB loaded', 'ok'); showUI();
     });
 
-    const changeOpacity = (val) => { currentOpacity = Math.max(0.1, Math.min(1.0, currentOpacity + val)); if(overlay) overlay.setOpacity(currentOpacity); if(overlayMini) overlayMini.setOpacity(currentOpacity); };
+    const changeOpacity = (val) => { currentOpacity = Math.max(0.1, Math.min(1.0, currentOpacity + val)); if(overlay) overlay.setOpacity(currentOpacity); if(overlayMini) overlayMini.setOpacity(currentOpacity); showUI(); };
 
     const render = () => {
       if (!imgData) return; const bounds = L.latLngBounds([lat - h/2, lng - w/2], [lat + h/2, lng + w/2]);
@@ -274,24 +296,24 @@
 
     const ACTIONS = { up: () => lat += step(), down: () => lat -= step(), left: () => lng -= step(), right: () => lng += step(), zoomin: () => { w*=1.05; h*=1.05; }, zoomout: () => { w*=0.95; h*=0.95; }, rotL: () => angle -= 1.5, rotR: () => angle += 1.5, opPlus: () => changeOpacity(0.1), opMinus: () => changeOpacity(-0.1) };
     const step = () => 0.000015 * Math.max(1, 22 - map.getZoom());
-    const adjust = action => { if (!overlay) return; ACTIONS[action]?.(); render(); };
+    const adjust = action => { if (!overlay) return; ACTIONS[action]?.(); render(); showUI(); };
     const remove = async () => {
       if (!overlay) return; const ok = await Modal.confirm('Remove FMB?'); if (!ok) return;
       map.removeLayer(overlay); overlay = null; mini.removeLayer(overlayMini); overlayMini = null; imgData = ''; document.getElementById('fmbTools').style.display = 'none';
-      if (State.touchMove) toggleTouch(); Toast.show('FMB removed', 'info');
+      if (State.touchMove) toggleTouch(); Toast.show('FMB removed', 'info'); showUI();
     };
 
     const toggleTouch = () => {
       if (map.pm.GlobalDrawMode) map.pm.disableDraw(); State.touchMove = !State.touchMove; const btn = document.getElementById('touchMoveBtn');
       if (State.touchMove) { map.dragging.disable(); map.touchZoom.disable(); btn.classList.add('on-accent'); State.activeTool='MOVE FMB'; } 
       else { map.dragging.enable(); map.touchZoom.enable(); btn.classList.remove('on-accent'); State.activeTool=null; }
-      updateStatus();
+      updateStatus(); showUI();
     };
 
     // TOUCH AND MOUSE EVENTS FOR FMB
     const mc = map.getContainer();
     mc.addEventListener('touchstart', e => {
-      if (!State.touchMove || !overlay) return; e.preventDefault();
+      if (!State.touchMove || !overlay) return; e.preventDefault(); showUI();
       if (e.touches.length === 1) { touchStart = { x:e.touches[0].clientX, y:e.touches[0].clientY }; startLat = lat; startLng = lng; } 
       else if (e.touches.length === 2) {
         pinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
@@ -300,7 +322,7 @@
     }, { passive:false });
 
     mc.addEventListener('touchmove', e => {
-      if (!State.touchMove || !overlay) return; e.preventDefault();
+      if (!State.touchMove || !overlay) return; e.preventDefault(); showUI();
       if (e.touches.length === 1 && touchStart) {
         const p = map.latLngToContainerPoint([startLat, startLng]);
         const nl = map.containerPointToLatLng(L.point(p.x+(e.touches[0].clientX-touchStart.x), p.y+(e.touches[0].clientY-touchStart.y))); lat = nl.lat; lng = nl.lng;
@@ -314,23 +336,23 @@
     mc.addEventListener('touchend', () => { touchStart = null; pinchDist = 0; }, { passive:false });
 
     let mouseStart = null;
-    mc.addEventListener('mousedown', e => { if (!State.touchMove || !overlay || e.button!==0) return; e.preventDefault(); mouseStart = { x:e.clientX, y:e.clientY }; startLat = lat; startLng = lng; });
-    document.addEventListener('mousemove', e => { if (!State.touchMove || !overlay || !mouseStart) return; e.preventDefault(); const p = map.latLngToContainerPoint([startLat, startLng]); const nl = map.containerPointToLatLng(L.point(p.x+(e.clientX-mouseStart.x), p.y+(e.clientY-mouseStart.y))); lat = nl.lat; lng = nl.lng; render(); });
+    mc.addEventListener('mousedown', e => { if (!State.touchMove || !overlay || e.button!==0) return; e.preventDefault(); mouseStart = { x:e.clientX, y:e.clientY }; startLat = lat; startLng = lng; showUI(); });
+    document.addEventListener('mousemove', e => { if (!State.touchMove || !overlay || !mouseStart) return; e.preventDefault(); const p = map.latLngToContainerPoint([startLat, startLng]); const nl = map.containerPointToLatLng(L.point(p.x+(e.clientX-mouseStart.x), p.y+(e.clientY-mouseStart.y))); lat = nl.lat; lng = nl.lng; render(); showUI(); });
     document.addEventListener('mouseup', () => mouseStart = null);
-    mc.addEventListener('wheel', e => { if (!State.touchMove || !overlay) return; e.preventDefault(); if (e.deltaY < 0) { w*=1.03; h*=1.03; } else { w*=0.97; h*=0.97; } render(); }, { passive: false });
+    mc.addEventListener('wheel', e => { if (!State.touchMove || !overlay) return; e.preventDefault(); if (e.deltaY < 0) { w*=1.03; h*=1.03; } else { w*=0.97; h*=0.97; } render(); showUI(); }, { passive: false });
     
     return { adjust, remove, toggleTouch, getGeoRef: () => overlay ? { lat, lng, w, h, angle } : null, getImageData: () => overlay ? imgData : null };
   })();
 
   const IO = (() => {
-    return { exportKML: () => { Toast.show('KML Download mapped to native code.', 'info'); } };
+    return { exportKML: () => { Toast.show('KML Download mapping enabled.', 'info'); } };
   })();
 
-  // Click on Map Logic
+  // Click on Map Logic for Navigation
   map.on('click', e => { 
     if (State.routeMode) {
       GIS.Draw.navigateExternal(e.latlng.lat, e.latlng.lng);
-      GIS.Draw.toggleRouteMode(); // ഓഫ് ആകാൻ
+      GIS.Draw.toggleRouteMode(); // Turn off route mode after clicking
     } 
   });
 

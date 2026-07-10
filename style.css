@@ -10,6 +10,7 @@
   --green:       #16a34a;
   --red:         #dc2626;
   --blue:        #2563eb;
+  --blue-light:  #60a5fa;
   --text:        #dde4ef;
   --text-dim:    #8899b0;
   --font:        'Syne', sans-serif;
@@ -18,41 +19,53 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width:100%; height:100%; background:var(--bg); font-family:var(--font); color:var(--text); overflow:hidden; }
 
-/* MAP takes up the entire screen minus the 40px left sidebar */
-#map { position:absolute; top:0; bottom:0; left:42px; right:0; z-index:1; }
+/* MAP Full Screen */
+#map { position:absolute; top:0; bottom:0; left:0; right:0; z-index:1; }
 
-/* ── EXTREME NARROW LEFT SIDEBAR (Width: 42px ≈ 5mm visual on phone) ── */
+/* ── EXTREME NARROW LEFT SIDEBAR (100% Transparent, Auto-hide) ── */
 .left-sidebar {
-  position: absolute; top: 0; left: 0; bottom: 0; width: 42px;
-  background: var(--surface); border-right: 1px solid var(--border-hi);
+  position: absolute; top: 0; left: 0; bottom: 0; width: 44px;
+  background: transparent; border-right: none;
   z-index: 3000; display: flex; flex-direction: column; align-items: center;
-  padding: 8px 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none;
-  box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+  padding: 12px 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none;
+  box-shadow: none; pointer-events: none; /* Let map clicks through empty space */
+  
+  transform: translateX(-100%);
+  opacity: 0;
+  transition: transform 0.4s ease, opacity 0.4s ease;
 }
 .left-sidebar::-webkit-scrollbar { display: none; }
 
-/* Main Category Buttons */
+/* Show toolbar when screen is active */
+body.show-ui .left-sidebar {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* Main Category Buttons (Floating) */
 .menu-cat {
-  width: 34px; height: 34px; border-radius: 6px; background: transparent;
-  color: var(--saffron); border: 1px solid transparent; font-size: 16px; margin-bottom: 6px;
+  width: 36px; height: 36px; border-radius: 8px; background: rgba(10, 13, 20, 0.75);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  color: var(--saffron); border: 1px solid rgba(255,255,255,0.15); font-size: 16px; margin-bottom: 8px;
   display: flex; justify-content: center; align-items: center; cursor: pointer; flex-shrink: 0;
-  transition: all 0.2s;
+  transition: all 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.5); pointer-events: auto;
 }
 .menu-cat.active { background: var(--surface-3); color: #fff; border-color: var(--saffron); }
 
-/* Sub Menu Container (Scrolls down vertically) */
+/* Sub Menu Container */
 .menu-sub {
-  display: none; flex-direction: column; align-items: center; gap: 4px;
-  width: 100%; margin-bottom: 8px; padding-bottom: 8px;
+  display: none; flex-direction: column; align-items: center; gap: 6px;
+  width: 100%; margin-bottom: 12px; padding-bottom: 8px; pointer-events: auto;
 }
 .menu-sub.open { display: flex; }
 
-/* Sub Menu Buttons (Max 3 Fonts / Icons) */
+/* Sub Menu Buttons (Max 3 Fonts/Icons) */
 .mb {
-  width: 32px; height: 32px; background: var(--surface-2); color: var(--text);
-  border: 1px solid var(--border); border-radius: 4px;
+  width: 34px; height: 34px; background: rgba(10, 13, 20, 0.85); color: var(--text);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
   font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center;
   cursor: pointer; flex-shrink: 0; text-transform: uppercase;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
 }
 .mb:active { transform: scale(0.9); }
 .mb.on-saffron { background: var(--saffron)!important; color: #fff!important; border-color: #e68a2e!important; }
@@ -61,29 +74,38 @@ html, body { width:100%; height:100%; background:var(--bg); font-family:var(--fo
 .menu-cat.on-blue { color: var(--blue)!important; }
 
 /* Horizontal separator line */
-.h-line { width: 24px; height: 1px; background: var(--border-hi); margin: 2px 0; }
+.h-line { width: 24px; height: 1px; background: rgba(255,255,255,0.15); margin: 4px 0; }
 
 /* Status Text Floating */
 #statusText {
-  position: absolute; top: 10px; left: 52px; z-index: 2000;
-  background: rgba(10,13,20,0.8); padding: 4px 10px; border-radius: 4px;
-  font-size: 10px; font-weight: 700; color: var(--saffron); border: 1px solid var(--border);
+  position: absolute; top: 12px; left: 56px; z-index: 2000;
+  background: rgba(10,13,20,0.8); padding: 4px 10px; border-radius: 6px;
+  font-size: 10px; font-weight: 800; color: var(--saffron); border: 1px solid var(--border);
   pointer-events: none; text-transform: uppercase; letter-spacing: 1px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  
+  transform: translateY(-20px); opacity: 0;
+  transition: transform 0.4s ease, opacity 0.4s ease;
 }
+body.show-ui #statusText { transform: translateY(0); opacity: 1; }
 
 /* Search Bar (Top Right) */
 .searchbar {
-  position:absolute; top:8px; right:10px; z-index:2800;
+  position:absolute; top:12px; right:12px; z-index:2800;
   display:flex; align-items:center; gap:4px; background:rgba(10, 13, 20, 0.95);
-  border:1px solid var(--border); border-radius:6px; padding:4px;
-  width: 200px; transition: all 0.3s; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  border:1px solid var(--border); border-radius:8px; padding:4px;
+  width: 200px; transition: all 0.4s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  pointer-events: auto;
 }
-.searchbar.collapsed { width: 34px; padding:0; border:none; background:transparent; box-shadow:none; }
+.searchbar.collapsed { width: 36px; padding:0; border:none; background:transparent; box-shadow:none; }
 .searchbar.collapsed input, .searchbar.collapsed #searchBtn { display: none; }
 .searchbar:not(.collapsed) #searchToggleBtn { display: none; }
-#searchToggleBtn { background:var(--surface-3); color:var(--text); border:1px solid var(--border); width:34px; height:34px; border-radius:6px; font-size:14px; display:flex; justify-content:center; align-items:center; }
+#searchToggleBtn { background:rgba(10, 13, 20, 0.75); backdrop-filter:blur(4px); color:var(--text); border:1px solid rgba(255,255,255,0.15); width:36px; height:36px; border-radius:8px; font-size:14px; display:flex; justify-content:center; align-items:center; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
 .searchbar input { background:none; border:none; outline:none; color:var(--text); font-size:12px; width:100%; padding:0 6px; }
-.searchbar button { background:var(--accent); color:#fff; border:none; width:28px; height:28px; border-radius:4px; cursor:pointer; }
+.searchbar button { background:var(--accent); color:#fff; border:none; width:30px; height:30px; border-radius:6px; cursor:pointer; }
+
+/* Hide search bubble if inactive completely */
+body:not(.show-ui) .searchbar.collapsed { transform: translateY(-20px); opacity: 0; pointer-events: none; }
 
 /* Popups & Elements */
 .blue-dot-container { display:flex!important; align-items:center!important; justify-content:center!important; position:relative!important; }
