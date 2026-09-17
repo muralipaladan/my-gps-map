@@ -9,7 +9,7 @@
   const KSREC_URL     = 'https://ksrec.in/geoserver/Kerala/wms';
   const DEFAULT_VIEW  = { lat: 11.196, lng: 76.227, zoom: 16 };
 
-  const State = { drawing: false, eraseMode: false, editMode: false, touchMove: false, routeMode: false, userLatLng: null, activeLayer: 'Hybrid', activeTool: null };
+  const State = { drawing: false, eraseMode: false, editMode: false, touchMove: false, routeMode: false, userLatLng: null, activeLayer: 'Hybrid', activeTool: null, notesCount: 0 };
 
   /* ── Auto-hide Toolbar Logic (Scroll out when idle) ── */
   let uiTimer = null;
@@ -71,7 +71,7 @@
   
   map.createPane('cadastralPane'); Object.assign(map.getPane('cadastralPane').style, { zIndex:'600', pointerEvents:'none' });
 
-  const WMS_BASE = { format:'image/png', transparent:true, maxZoom:22, tileSize:512, zoomOffset:-1, pane:'cadastralPane', className:'parcel-red' };
+  const WMS_BASE = { format:'image/png', transparent:true, maxZoom:22, tileSize:512, zoomOffset:-1, pane:'cadastralPane', className:'parcel-saffron' };
   const wmsLayers = {
     village: L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, layers:'v3:village' }),
     cadastral: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, layers:'Kerala:Cadastry_Kerala' }).addTo(map),
@@ -103,6 +103,18 @@
       document.querySelectorAll('.menu-cat').forEach(el => { if(el.id.startsWith('cat-')) el.classList.remove('active') });
       
       if (!isOpen) { sub.classList.add('open'); cat.classList.add('active'); }
+    },
+    toggleMore() {
+      showUI();
+      document.getElementById('morePanel').classList.toggle('open');
+    },
+    quickDraw() {
+      const panel = document.getElementById('morePanel');
+      if (!panel.classList.contains('open')) this.toggleMore();
+      this.toggleCat('draw');
+    },
+    closeMore() {
+      document.getElementById('morePanel').classList.remove('open');
     }
   };
 
@@ -170,6 +182,28 @@
     return { toggle };
   })();
 
+  const Stats = (() => {
+    const els = () => ({ area: document.getElementById('statArea'), points: document.getElementById('statPoints') });
+    const update = () => {
+      let areaM2 = 0, points = State.notesCount || 0;
+      drawnItems.eachLayer(l => {
+        if (l instanceof L.Polygon) {
+          const ring = l.getLatLngs()[0];
+          areaM2 += L.GeometryUtil.geodesicArea(ring);
+          points += ring.length;
+        } else if (l instanceof L.Polyline) {
+          points += l.getLatLngs().length;
+        } else if (l.getLatLng) {
+          points += 1;
+        }
+      });
+      const { area, points: pointsEl } = els();
+      if (area) area.textContent = `${(areaM2 / 1e6).toFixed(2)} KM²`;
+      if (pointsEl) pointsEl.textContent = points;
+    };
+    return { update };
+  })();
+
   const Draw = (() => {
     const savedNotes = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     const pinGroup = L.layerGroup().addTo(map), pinGroupMini = L.layerGroup().addTo(mini);
@@ -181,6 +215,7 @@
         L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(`<b>📍 Note</b><br>${p.text}<button class="p-nav" style="background:#0b8043;" onclick="GIS.Draw.navigateExternal(${p.lat}, ${p.lng})">Navigate</button><button class="p-del" onclick="GIS.Draw._deleteNote(${i})">Delete</button>`);
         L.marker([p.lat, p.lng]).addTo(pinGroupMini);
       });
+      State.notesCount = savedNotes.length; Stats.update();
     }; renderNotes();
 
     const clearHighlights = () => ['lineBtn','polygonBtn','markerBtn'].forEach(id => { document.getElementById(id)?.classList.remove('on-accent'); });
@@ -219,15 +254,28 @@
         layer.setStyle({ color: '#FF9933', fillColor: '#FF9933', fillOpacity: 0.15, weight: 2.5 });
         const updateAreaPopup = () => { const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]); const popupContent = `<b>Area</b><br>${(area * 0.000247105).toFixed(3)} ac`; if (layer.getPopup()) layer.setPopupContent(popupContent); else layer.bindPopup(popupContent).openPopup(); };
         updateAreaPopup(); layer.on('pm:edit pm:markerdragend pm:vertexadded pm:vertexremoved', updateAreaPopup);
+      } else if (shape === 'Line') {
+        layer.setStyle({ color: '#FF9933', weight: 3 });
+        const fmtLen = (m) => m >= 1000 ? `${(m/1000).toFixed(3)} km` : `${m.toFixed(1)} m`;
+        const updateLengthPopup = () => {
+          let len = 0;
+          try { len = L.GeometryUtil.length(layer); } catch (e) {
+            const pts = layer.getLatLngs(); for (let i=1;i<pts.length;i++) len += pts[i-1].distanceTo(pts[i]);
+          }
+          const popupContent = `<b>Length</b><br>${fmtLen(len)}`;
+          if (layer.getPopup()) layer.setPopupContent(popupContent); else layer.bindPopup(popupContent).openPopup();
+        };
+        updateLengthPopup(); layer.on('pm:edit pm:markerdragend pm:vertexadded pm:vertexremoved', updateLengthPopup);
       }
 
-      const origId = L.stamp(layer); const style = { color: shape === 'Line' ? (layer.options.color || '#FF9933') : '#FF9933', fillColor: '#FF9933', fillOpacity: 0.15, weight: layer.options.weight || 2.5 };
-      let miniL; if (shape === 'Line') miniL = L.polyline(layer.getLatLngs(), { color: layer.options.color || '#FF9933', weight: layer.options.weight || 3 }).addTo(drawnItemsMini); else miniL = L.polygon(layer.getLatLngs(), style).addTo(drawnItemsMini);
+      const origId = L.stamp(layer); const style = { color: '#FF9933', fillColor: '#FF9933', fillOpacity: 0.15, weight: layer.options.weight || 2.5 };
+      let miniL; if (shape === 'Line') miniL = L.polyline(layer.getLatLngs(), { color: '#FF9933', weight: layer.options.weight || 3 }).addTo(drawnItemsMini); else miniL = L.polygon(layer.getLatLngs(), style).addTo(drawnItemsMini);
       if (miniL) { vectorSync[origId] = L.stamp(miniL); layer.on('pm:edit pm:markerdrag', () => { const ml = drawnItemsMini.getLayer(vectorSync[L.stamp(layer)]); if (ml) ml.setLatLngs(layer.getLatLngs()); }); }
       document.getElementById('lineBtn').classList.remove('on-accent'); document.getElementById('polygonBtn').classList.remove('on-accent'); State.activeTool=null; updateStatus();
+      Stats.update();
     });
 
-    drawnItems.on('layerremove', e => { const oid = L.stamp(e.layer); const ml = drawnItemsMini.getLayer(vectorSync[oid]); if (ml) drawnItemsMini.removeLayer(ml); delete vectorSync[oid]; });
+    drawnItems.on('layerremove', e => { const oid = L.stamp(e.layer); const ml = drawnItemsMini.getLayer(vectorSync[oid]); if (ml) drawnItemsMini.removeLayer(ml); delete vectorSync[oid]; Stats.update(); });
 
     const toggleErase = () => {
       if (map.pm.GlobalDrawMode) map.pm.disableDraw(); if (State.editMode) toggleEdit(); if (State.routeMode) toggleRouteMode();
@@ -248,7 +296,7 @@
       drawnItems.clearLayers(); drawnItemsMini.clearLayers(); Object.keys(vectorSync).forEach(k => delete vectorSync[k]);
       map.eachLayer(l => { if (l.pm && l instanceof L.Path) map.removeLayer(l); });
       if (State.eraseMode) toggleErase(); if (State.editMode) toggleEdit();
-      Toast.show('Cleared', 'ok'); showUI();
+      Toast.show('Cleared', 'ok'); showUI(); Stats.update();
     };
 
     const toggleRouteMode = () => {
@@ -449,6 +497,30 @@
     } 
   });
 
-  window.GIS = { Layers, Search, GPS, Draw, FMB, UI, IO };
+  const MapCtrl = { zoomIn: () => map.zoomIn(), zoomOut: () => map.zoomOut() };
+
+  const Voice = (() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let rec = null, listening = false;
+    if (SR) {
+      rec = new SR(); rec.continuous = false; rec.interimResults = false; rec.lang = 'en-IN';
+      rec.onresult = (e) => {
+        const text = e.results[0][0].transcript;
+        document.getElementById('searchInput').value = text;
+        Search.execute();
+      };
+      rec.onerror = () => Toast.show('Voice search error', 'warn');
+      rec.onend = () => { listening = false; document.getElementById('micBtn')?.classList.remove('on-accent'); };
+    }
+    return {
+      toggle() {
+        if (!SR) { Toast.show('Voice search not supported', 'warn'); return; }
+        if (listening) { rec.stop(); listening = false; return; }
+        listening = true; document.getElementById('micBtn')?.classList.add('on-accent'); rec.start(); showUI();
+      }
+    };
+  })();
+
+  window.GIS = { Layers, Search, GPS, Draw, FMB, UI, IO, Stats, MapCtrl, Voice };
 
 })();
