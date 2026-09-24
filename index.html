@@ -18,13 +18,14 @@
 <div id="map"></div>
 <div id="zoomBox"></div>
 
+<!-- ORANGE LINES & BLACK SURVEY NUMBERS FILTER -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <filter id="burgundyRecolor" color-interpolation-filters="sRGB">
+  <filter id="orangeRecolor" color-interpolation-filters="sRGB">
     <feColorMatrix type="matrix" values="
-      0 0 0 0 0.502
-      0 0 0 0 0.000
-      0 0 0 0 0.125
-      0 0 0 1 0" />
+      0.898 0 0 0 0
+      0.357 0 0 0 0
+      0.141 0 0 0 0
+      0     0 0 1 0" />
   </filter>
 </svg>
 
@@ -112,7 +113,7 @@
   <button onclick="GIS.MapCtrl.zoomOut()" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
 </div>
 
-<!-- BOTTOM RIGHT CONTROLS: Field Report with Folder Icon Only & GPS Icon Only -->
+<!-- BOTTOM RIGHT CONTROLS -->
 <div class="fab-stack">
   <button class="fab-pill icon-only" onclick="document.getElementById('exportMenu').classList.toggle('active')" title="ഫീൽഡ് റിപ്പോർട്ട്">
     <i class="fa-solid fa-folder"></i>

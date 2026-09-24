@@ -54,7 +54,8 @@
 
   map.createPane('cadastralPane'); Object.assign(map.getPane('cadastralPane').style, { zIndex:'600', pointerEvents:'none' });
 
-  const WMS_BASE = { format:'image/png', transparent:true, maxZoom:22, tileSize:512, zoomOffset:-1, pane:'cadastralPane', className:'parcel-burgundy' };
+  // Applied orange recolor class for survey line and survey numbers
+  const WMS_BASE = { format:'image/png', transparent:true, maxZoom:22, tileSize:512, zoomOffset:-1, pane:'cadastralPane', className:'parcel-orange' };
   const wmsLayers = {
     village: L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, layers:'v3:village' }),
     cadastral: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, layers:'Kerala:Cadastry_Kerala' }).addTo(map),
@@ -453,7 +454,6 @@
     if (file) { GIS.IO.uploadFile(file); e.target.value = ''; document.getElementById('exportMenu').classList.remove('active'); }
   });
 
-  // Auto-close tools and menus when map is touched/clicked
   map.on('click', e => { 
     UI.closeRibbon();
     document.getElementById('exportMenu')?.classList.remove('active');
