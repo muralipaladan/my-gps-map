@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Sodestus — Professional Mobile GIS</title>
+  <title>Sodestus — Mobile GIS & FMB Tool</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
@@ -16,18 +16,7 @@
 <body>
 
 <div id="map"></div>
-<div id="zoomBox"></div>
-
-<!-- ORANGE LINES & BLACK SURVEY NUMBERS FILTER -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <filter id="orangeRecolor" color-interpolation-filters="sRGB">
-    <feColorMatrix type="matrix" values="
-      0.898 0 0 0 0
-      0.357 0 0 0 0
-      0.141 0 0 0 0
-      0     0 0 1 0" />
-  </filter>
-</svg>
+<div id="statusText">CAD</div>
 
 <!-- TOP SEARCH BAR -->
 <div class="topbar">
@@ -38,120 +27,92 @@
   <div class="searchbar" id="searchBar">
     <i class="fa-solid fa-magnifying-glass search-icon"></i>
     <input type="text" id="searchInput" placeholder="Search place or Lat, Lng (eg: 11.19, 76.22)..." autocomplete="off" />
-    <button id="micBtn" onclick="GIS.Voice.toggle()" title="Voice search"><i class="fa-solid fa-microphone"></i></button>
-    <button id="searchBtn" title="Search"><i class="fa-solid fa-arrow-right"></i></button>
+    <button id="searchBtn" onclick="GIS.MapCtrl.searchLocation()" title="Search"><i class="fa-solid fa-arrow-right"></i></button>
   </div>
 </div>
-
-<div id="statusText">CAD</div>
 
 <!-- VERTICAL TOOL RIBBON -->
 <div class="tool-ribbon" id="toolRibbon">
   
   <!-- MAIN MENU PAGE -->
   <div class="ribbon-page active" id="pageMain">
-    <button class="mb" onclick="GIS.UI.showRibbonPage('draw')" title="ഡ്രോയിംഗ് ടൂളുകൾ"><i class="fa-solid fa-pen-ruler"></i></button>
+    <button class="mb" onclick="GIS.UI.showRibbonPage('draw')" title="ഡ്രോയിംഗ്"><i class="fa-solid fa-pen-ruler"></i></button>
     <button class="mb" onclick="GIS.UI.showRibbonPage('fmb')" id="btnFMBPage" title="FMB ടൂളുകൾ"><i class="fa-solid fa-sliders"></i></button>
     <button class="mb" onclick="GIS.UI.showRibbonPage('layers')" title="ലെയറുകൾ"><i class="fa-solid fa-layer-group"></i></button>
     <div class="rb-divider"></div>
-    <label class="mb on-green" title="FMB അപ്‌ലോഡ്"><i class="fa-solid fa-file-image"></i><input type="file" id="uploadFMB" accept=".jpg,.png,.pdf" style="display:none" /></label>
-    <button class="mb" id="routeModeBtn" onclick="GIS.Draw.toggleRouteMode()" title="നാവിഗേറ്റ്"><i class="fa-solid fa-location-arrow"></i></button>
+    <label class="mb on-green" title="FMB അപ്‌ലോഡ്">
+      <i class="fa-solid fa-file-image"></i>
+      <input type="file" id="uploadFMB" accept=".jpg,.png,.jpeg" onchange="GIS.FMB.handleFileUpload(event)" style="display:none" />
+    </label>
+    <button class="mb" id="routeModeBtn" onclick="GIS.GPS.toggle()" title="GPS Tracking"><i class="fa-solid fa-location-arrow"></i></button>
   </div>
 
   <!-- DRAWING SUB-TOOLS PAGE -->
   <div class="ribbon-page" id="pageDraw">
     <button class="mb back-btn" onclick="GIS.UI.showRibbonPage('main')" title="Back"><i class="fa-solid fa-arrow-left"></i></button>
     <div class="rb-divider"></div>
-    <button class="mb" id="markerBtn" onclick="GIS.Draw.trigger('Marker')"><i class="fa-solid fa-location-dot"></i></button>
-    <button class="mb" id="lineBtn" onclick="GIS.Draw.trigger('Line')"><i class="fa-solid fa-slash"></i></button>
-    <button class="mb" id="polygonBtn" onclick="GIS.Draw.trigger('Polygon')"><i class="fa-solid fa-draw-polygon"></i></button>
-    <button class="mb" id="editBtn" onclick="GIS.Draw.toggleEdit()"><i class="fa-solid fa-pen-to-square"></i></button>
-    <button class="mb" id="eraseModeBtn" onclick="GIS.Draw.toggleErase()"><i class="fa-solid fa-eraser"></i></button>
+    <button class="mb" onclick="GIS.Draw.trigger('Marker')"><i class="fa-solid fa-location-dot"></i></button>
+    <button class="mb" onclick="GIS.Draw.trigger('Line')"><i class="fa-solid fa-slash"></i></button>
+    <button class="mb" onclick="GIS.Draw.trigger('Polygon')"><i class="fa-solid fa-draw-polygon"></i></button>
     <button class="mb" style="color:var(--red);" onclick="GIS.Draw.clearAll()"><i class="fa-solid fa-trash-can"></i></button>
   </div>
 
-  <!-- FMB ADJUSTMENT SUB-TOOLS PAGE -->
+  <!-- FMB PRECISION ADJUSTMENT PAGE -->
   <div class="ribbon-page" id="pageFMB">
     <button class="mb back-btn" onclick="GIS.UI.showRibbonPage('main')" title="Back"><i class="fa-solid fa-arrow-left"></i></button>
     <div class="rb-divider"></div>
-    <button class="mb" id="touchMoveBtn" onclick="GIS.FMB.toggleTouch()"><i class="fa-solid fa-hand"></i></button>
-    <button class="mb" onclick="GIS.FMB.adjust('up')"><i class="fa-solid fa-caret-up"></i></button>
-    <button class="mb" onclick="GIS.FMB.adjust('down')"><i class="fa-solid fa-caret-down"></i></button>
-    <button class="mb" onclick="GIS.FMB.adjust('left')"><i class="fa-solid fa-caret-left"></i></button>
-    <button class="mb" onclick="GIS.FMB.adjust('right')"><i class="fa-solid fa-caret-right"></i></button>
-    <button class="mb" onclick="GIS.FMB.adjust('zoomin')"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
-    <button class="mb" onclick="GIS.FMB.adjust('zoomout')"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
-    <button class="mb" onclick="GIS.FMB.adjust('rotL')"><i class="fa-solid fa-rotate-left"></i></button>
-    <button class="mb" onclick="GIS.FMB.adjust('rotR')"><i class="fa-solid fa-rotate-right"></i></button>
-    <button class="mb" onclick="GIS.FMB.adjust('opPlus')"><i class="fa-solid fa-eye"></i></button>
-    <button class="mb" onclick="GIS.FMB.adjust('opMinus')"><i class="fa-solid fa-eye-slash"></i></button>
-    <button class="mb" style="color:var(--red);" onclick="GIS.FMB.remove()"><i class="fa-solid fa-trash"></i></button>
+
+    <!-- Rotation Precision Selector -->
+    <select id="rotStepSelect" class="step-select" onchange="GIS.FMB.setRotStep(this.value)" title="Rotation Precision">
+      <option value="0.001">0.001°</option>
+      <option value="0.01">0.01°</option>
+      <option value="0.1" selected>0.1°</option>
+      <option value="1">1.0°</option>
+    </select>
+
+    <!-- Movement Precision Selector -->
+    <select id="moveStepSelect" class="step-select" onchange="GIS.FMB.setMoveStep(this.value)" title="Movement Accuracy">
+      <option value="0.0000005">Ultra (0.05m)</option>
+      <option value="0.000001">Fine (0.1m)</option>
+      <option value="0.00001" selected>Medium (1m)</option>
+      <option value="0.0001">Coarse (10m)</option>
+    </select>
+
+    <div class="rb-divider"></div>
+    <button class="mb" onclick="GIS.FMB.adjust('up')" title="Shift Up"><i class="fa-solid fa-caret-up"></i></button>
+    <button class="mb" onclick="GIS.FMB.adjust('down')" title="Shift Down"><i class="fa-solid fa-caret-down"></i></button>
+    <button class="mb" onclick="GIS.FMB.adjust('left')" title="Shift Left"><i class="fa-solid fa-caret-left"></i></button>
+    <button class="mb" onclick="GIS.FMB.adjust('right')" title="Shift Right"><i class="fa-solid fa-caret-right"></i></button>
+    <div class="rb-divider"></div>
+    <button class="mb" onclick="GIS.FMB.adjust('rotL')" title="Rotate Anti-Clockwise"><i class="fa-solid fa-rotate-left"></i></button>
+    <button class="mb" onclick="GIS.FMB.adjust('rotR')" title="Rotate Clockwise"><i class="fa-solid fa-rotate-right"></i></button>
+    <div class="rb-divider"></div>
+    <button class="mb" onclick="GIS.FMB.adjust('zoomin')" title="Scale Up"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+    <button class="mb" onclick="GIS.FMB.adjust('zoomout')" title="Scale Down"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+    <button class="mb" onclick="GIS.FMB.adjust('opPlus')" title="Increase Opacity"><i class="fa-solid fa-eye"></i></button>
+    <button class="mb" onclick="GIS.FMB.adjust('opMinus')" title="Decrease Opacity"><i class="fa-solid fa-eye-slash"></i></button>
+    <button class="mb" style="color:var(--red);" onclick="GIS.FMB.remove()" title="Delete FMB"><i class="fa-solid fa-trash"></i></button>
   </div>
 
-  <!-- LAYERS SUB-TOOLS PAGE -->
+  <!-- LAYERS PAGE -->
   <div class="ribbon-page" id="pageLayers">
     <button class="mb back-btn" onclick="GIS.UI.showRibbonPage('main')" title="Back"><i class="fa-solid fa-arrow-left"></i></button>
     <div class="rb-divider"></div>
-    <button class="mb basetile" data-base="hybrid" onclick="GIS.Layers.setBase('hybrid')"><span class="bt-hybrid"></span></button>
-    <button class="mb basetile" data-base="road" onclick="GIS.Layers.setBase('road')"><span class="bt-road"></span></button>
-    <button class="mb basetile" data-base="osm" onclick="GIS.Layers.setBase('osm')"><span class="bt-osm"></span></button>
+    <button class="mb" onclick="GIS.Layers.setBase('hybrid')">HYB</button>
+    <button class="mb" onclick="GIS.Layers.setBase('osm')">OSM</button>
     <div class="rb-divider"></div>
-    <button class="mb" id="btnVil" onclick="GIS.Layers.toggleWms('village')">VIL</button>
-    <button class="mb" id="btnCad" onclick="GIS.Layers.toggleWms('cadastral')">CAD</button>
-    <button class="mb" id="btnKCH" onclick="GIS.Layers.toggleWms('parcelKCH')">KCH</button>
-    <button class="mb" id="btnKKD" onclick="GIS.Layers.toggleWms('parcelKKD')">KKD</button>
-    <button class="mb" id="btnKLM" onclick="GIS.Layers.toggleWms('parcelKLM')">KLM</button>
-    <button class="mb" id="btnTCR" onclick="GIS.Layers.toggleWms('parcelTCR')">TCR</button>
-    <button class="mb" id="btnTVM" onclick="GIS.Layers.toggleWms('parcelTVM')">TVM</button>
+    <button class="mb" id="btnCad" onclick="GIS.Layers.toggleCadastral()">CAD</button>
   </div>
 
 </div>
 
 <!-- ZOOM CONTROLS -->
 <div class="zoom-ctrl">
-  <button onclick="GIS.MapCtrl.zoomIn()" title="Zoom In"><i class="fa-solid fa-plus"></i></button>
-  <button onclick="GIS.MapCtrl.zoomOut()" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
-</div>
-
-<!-- BOTTOM RIGHT CONTROLS -->
-<div class="fab-stack">
-  <button class="fab-pill icon-only" onclick="document.getElementById('exportMenu').classList.toggle('active')" title="ഫീൽഡ് റിപ്പോർട്ട്">
-    <i class="fa-solid fa-folder"></i>
-  </button>
-  <button class="fab-pill icon-only" id="gpsBtn" onclick="GIS.GPS.toggle()" title="GPS On/Off">
-    <i class="fa-solid fa-location-crosshairs"></i>
-  </button>
-</div>
-
-<!-- Export/Save Popup Menu -->
-<div class="export-menu" id="exportMenu">
-  <button class="btn btn-export" onclick="GIS.IO.exportKMZ(); document.getElementById('exportMenu').classList.remove('active');">
-    <i class="fa-solid fa-file-zipper"></i> Save KMZ
-  </button>
-  <label class="btn btn-import" style="margin-top:4px; justify-content:center;">
-    <i class="fa-solid fa-file-import"></i> Load KML / KMZ
-    <input type="file" id="uploadFile" accept=".kml,.kmz,.json,.geojson" style="display:none" />
-  </label>
-</div>
-
-<div id="toast-root"></div>
-
-<div class="modal-backdrop" id="modalBackdrop">
-  <div class="modal">
-    <div class="modal-title" id="modalTitle">Confirm</div>
-    <div class="modal-body" id="modalBody">Are you sure?</div>
-    <div class="modal-actions">
-      <button class="modal-btn cancel" id="modalCancel">Cancel</button>
-      <button class="modal-btn confirm" id="modalConfirm">Confirm</button>
-    </div>
-  </div>
+  <button onclick="GIS.MapCtrl.zoomIn()"><i class="fa-solid fa-plus"></i></button>
+  <button onclick="GIS.MapCtrl.zoomOut()"><i class="fa-solid fa-minus"></i></button>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-<script src="https://unpkg.com/@mapbox/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
 <script src="script.js"></script>
 
