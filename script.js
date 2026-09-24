@@ -11,25 +11,6 @@
 
   const State = { drawing: false, eraseMode: false, editMode: false, touchMove: false, routeMode: false, userLatLng: null, activeLayer: 'Hybrid', activeTool: null, notesCount: 0 };
 
-  /* ── Auto-hide Toolbar Logic (Scroll out when idle) ── */
-  let uiTimer = null;
-  const showUI = () => {
-    document.body.classList.add('show-ui');
-    clearTimeout(uiTimer);
-    uiTimer = setTimeout(() => {
-      if (!State.drawing && !State.touchMove && !State.eraseMode && !State.editMode && !State.routeMode) {
-        document.body.classList.remove('show-ui');
-        document.querySelectorAll('.menu-sub').forEach(el => el.classList.remove('open'));
-        document.querySelectorAll('.menu-cat').forEach(el => el.classList.remove('active'));
-        document.getElementById('exportMenu').classList.remove('active');
-      }
-    }, 5000); 
-  };
-
-  document.addEventListener('mousemove', showUI);
-  document.addEventListener('touchstart', showUI, {passive: true});
-  document.addEventListener('keydown', showUI);
-
   const Toast = (() => {
     const root = document.getElementById('toast-root');
     const ICONS = { info:'fa-circle-info', ok:'fa-circle-check', warn:'fa-triangle-exclamation', error:'fa-circle-xmark' };
@@ -62,16 +43,18 @@
     osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:22 })
   };
 
-  // TOOLTIPS DISABLED IN LEAFLET GEOMAN
   map.pm.setGlobalOptions({ 
-    tooltips: false, // <-- This removes the guide text near mouse
+    tooltips: false,
     snappable:true, snapDistance:25, snapMiddle:true, layerGroup:map, 
     hintMarkerStyle: { opacity: 0, fillOpacity: 0 }, templineStyle: { color: '#FF9933' } 
   });
   
+  // Remove default Geoman controls from map
+  map.pm.removeControls();
+
   map.createPane('cadastralPane'); Object.assign(map.getPane('cadastralPane').style, { zIndex:'600', pointerEvents:'none' });
 
-  const WMS_BASE = { format:'image/png', transparent:true, maxZoom:22, tileSize:512, zoomOffset:-1, pane:'cadastralPane', className:'parcel-saffron' };
+  const WMS_BASE = { format:'image/png', transparent:true, maxZoom:22, tileSize:512, zoomOffset:-1, pane:'cadastralPane', className:'parcel-burgundy' };
   const wmsLayers = {
     village: L.tileLayer.wms(BHUVAN_URL, { ...WMS_BASE, layers:'v3:village' }),
     cadastral: L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, layers:'Kerala:Cadastry_Kerala' }).addTo(map),
@@ -83,8 +66,6 @@
   };
   State.activeLayer = 'CAD'; updateStatus();
 
-  map.on('dragstart zoomstart', showUI);
-
   const mini = L.map('zoomBox', { attributionControl:false, zoomControl:false, dragging:false, touchZoom:false, scrollWheelZoom:false, doubleClickZoom:false, boxZoom:false, layers:[L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom:22, subdomains:['mt0','mt1','mt2','mt3'] })] });
   mini.createPane('miniCadastral'); Object.assign(mini.getPane('miniCadastral').style, { zIndex:'600', pointerEvents:'none' });
   L.tileLayer.wms(KSREC_URL, { ...WMS_BASE, pane:'miniCadastral', layers:'Kerala:Cadastry_Kerala' }).addTo(mini);
@@ -93,28 +74,16 @@
   const vectorSync = {};
 
   const UI = {
-    toggleCat(id) {
-      showUI(); 
-      const sub = document.getElementById('sub-'+id);
-      const cat = document.getElementById('cat-'+id);
-      const isOpen = sub.classList.contains('open');
-      
-      document.querySelectorAll('.menu-sub').forEach(el => el.classList.remove('open'));
-      document.querySelectorAll('.menu-cat').forEach(el => { if(el.id.startsWith('cat-')) el.classList.remove('active') });
-      
-      if (!isOpen) { sub.classList.add('open'); cat.classList.add('active'); }
+    toggleMore() { document.getElementById('toolRibbon').classList.toggle('open'); },
+    openRibbon() { document.getElementById('toolRibbon').classList.add('open'); },
+    closeRibbon() { 
+      document.getElementById('toolRibbon').classList.remove('open'); 
+      UI.showRibbonPage('main');
     },
-    toggleMore() {
-      showUI();
-      document.getElementById('morePanel').classList.toggle('open');
-    },
-    quickDraw() {
-      const panel = document.getElementById('morePanel');
-      if (!panel.classList.contains('open')) this.toggleMore();
-      this.toggleCat('draw');
-    },
-    closeMore() {
-      document.getElementById('morePanel').classList.remove('open');
+    showRibbonPage(pageName) {
+      document.querySelectorAll('.ribbon-page').forEach(p => p.classList.remove('active'));
+      const target = { main: 'pageMain', draw: 'pageDraw', fmb: 'pageFMB', layers: 'pageLayers' }[pageName];
+      if (target) document.getElementById(target)?.classList.add('active');
     }
   };
 
@@ -122,16 +91,16 @@
     setBase(key) {
       Object.values(baseLayers).forEach(l => map.removeLayer(l)); map.addLayer(baseLayers[key]);
       const titles = { hybrid: 'HYB', road: 'ROD', osm: 'OSM' };
-      document.querySelectorAll('#sub-layers .mb').forEach(b => { if(['HYB','ROD','OSM'].includes(b.textContent)) b.classList.remove('on-saffron'); });
-      document.querySelector(`#sub-layers button[title="${document.querySelector(`button[onclick*="'${key}'"]`).title}"]`).classList.add('on-saffron');
+      document.querySelectorAll('#toolRibbon .basetile').forEach(b => b.classList.remove('on-saffron'));
+      document.querySelector(`#toolRibbon .basetile[data-base="${key}"]`)?.classList.add('on-saffron');
       State.activeLayer = titles[key]; updateStatus(); Toast.show(`${titles[key]} Active`);
     },
     toggleWms(type) {
       const layer = wmsLayers[type];
       const NAMES = { village:'VIL', cadastral:'CAD', parcelKCH:'KCH', parcelKKD:'KKD', parcelKLM:'KLM', parcelTCR:'TCR', parcelTVM:'TVM' };
       const btn = document.querySelector(`button[onclick*="'${type}'"]`);
-      if (map.hasLayer(layer)) { map.removeLayer(layer); btn.classList.remove('on-saffron'); Toast.show(`${NAMES[type]} hidden`); } 
-      else { map.addLayer(layer); btn.classList.add('on-saffron'); State.activeLayer = NAMES[type]; updateStatus(); Toast.show(`${NAMES[type]} active`); }
+      if (map.hasLayer(layer)) { map.removeLayer(layer); btn?.classList.remove('on-saffron'); Toast.show(`${NAMES[type]} hidden`); } 
+      else { map.addLayer(layer); btn?.classList.add('on-saffron'); State.activeLayer = NAMES[type]; updateStatus(); Toast.show(`${NAMES[type]} active`); }
     }
   };
 
@@ -139,7 +108,7 @@
     let marker = null;
     const execute = async () => {
       const raw = document.getElementById('searchInput').value.trim(); if (!raw) return;
-      if (marker) map.removeLayer(marker); document.getElementById('searchBar').classList.add('collapsed');
+      if (marker) map.removeLayer(marker);
       const parts = raw.split(/[\s,]+/);
       if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
         const [lat, lng] = parts.map(Number); map.setView([lat, lng], 17);
@@ -159,22 +128,42 @@
 
   const GPS = (() => {
     let active = false, watchId = null, userMarker = null, ring = null, userMarkerMini = null, ringMini = null;
-    const crossIcon = L.divIcon({ className:'blue-dot-container', html:'<div class="cross-v"></div><div class="cross-h"></div><div class="blue-dot"></div>', iconSize:[60,60], iconAnchor:[30,30] });
+    let lastAccuracy = Infinity, firstFix = true;
+    const ACCURACY_REJECT_MAX = 100;
+    const ACCURACY_JUMP_RATIO = 2.5;
+    
+    const bluePointIcon = L.divIcon({ 
+      className: 'blue-dot-container', 
+      html: '<div class="blue-dot"></div>', 
+      iconSize: [20, 20], 
+      iconAnchor: [10, 10] 
+    });
+
     const onLocationUpdate = (position) => {
-      const { latitude:lat, longitude:lng, accuracy } = position.coords; const latlng = L.latLng(lat, lng);
-      State.userLatLng = latlng; map.panTo(latlng);
+      const { latitude:lat, longitude:lng, accuracy } = position.coords;
+      if (accuracy > ACCURACY_REJECT_MAX) { Toast.show(`GPS സിഗ്നൽ ദുർബലം (±${Math.round(accuracy)}m)`, 'warn', 2000); return; }
+      if (!firstFix && accuracy > lastAccuracy * ACCURACY_JUMP_RATIO) return;
+      lastAccuracy = accuracy; firstFix = false;
+      const latlng = L.latLng(lat, lng); State.userLatLng = latlng; map.panTo(latlng);
+      const popupTxt = `±${Math.round(accuracy)}m`;
       if (!userMarker) {
-        userMarker = L.marker(latlng, { icon:crossIcon }).addTo(map); ring = L.circle(latlng, { radius:accuracy, color:'#60a5fa', weight:1, opacity:.3, fillOpacity:.04 }).addTo(map);
-        userMarkerMini = L.marker(latlng, { icon:crossIcon }).addTo(mini); ringMini = L.circle(latlng, { radius:accuracy, color:'#60a5fa', weight:1, opacity:.3, fillOpacity:.04 }).addTo(mini);
+        userMarker = L.marker(latlng, { icon: bluePointIcon }).addTo(map).bindPopup(popupTxt);
+        ring = L.circle(latlng, { radius:accuracy, color:'#2563eb', weight:1, opacity:.4, fillOpacity:.08 }).addTo(map);
+        userMarkerMini = L.marker(latlng, { icon: bluePointIcon }).addTo(mini); 
+        ringMini = L.circle(latlng, { radius:accuracy, color:'#2563eb', weight:1, opacity:.4, fillOpacity:.08 }).addTo(mini);
       } else {
-        userMarker.setLatLng(latlng); ring.setLatLng(latlng).setRadius(accuracy);
+        userMarker.setLatLng(latlng); userMarker.setPopupContent(popupTxt); ring.setLatLng(latlng).setRadius(accuracy);
         userMarkerMini.setLatLng(latlng); ringMini.setLatLng(latlng).setRadius(accuracy);
       }
     };
-    const start = () => { if (navigator.geolocation) watchId = navigator.geolocation.watchPosition(onLocationUpdate, ()=>{}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); };
+    const onLocationError = (err) => { Toast.show('GPS ലഭ്യമല്ല: ' + (err.message || 'സ്ഥാനം കണ്ടെത്താനായില്ല'), 'warn'); };
+    const start = () => {
+      if (!navigator.geolocation) { Toast.show('GPS ഈ ഉപകരണത്തിൽ ലഭ്യമല്ല', 'warn'); return; }
+      lastAccuracy = Infinity; firstFix = true;
+      watchId = navigator.geolocation.watchPosition(onLocationUpdate, onLocationError, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+    };
     const stop = () => { if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; } if (userMarker) { map.removeLayer(userMarker); map.removeLayer(ring); mini.removeLayer(userMarkerMini); mini.removeLayer(ringMini); userMarker=null; ring=null; userMarkerMini=null; ringMini=null; } };
     const toggle = () => {
-      showUI();
       const btn = document.getElementById('gpsBtn');
       if (!active) { active = true; btn.classList.add('on-blue'); start(); Toast.show('GPS Active', 'ok'); }
       else { active = false; btn.classList.remove('on-blue'); stop(); Toast.show('GPS Stopped', 'info'); }
@@ -182,32 +171,9 @@
     return { toggle };
   })();
 
-  const Stats = (() => {
-    const els = () => ({ area: document.getElementById('statArea'), points: document.getElementById('statPoints') });
-    const update = () => {
-      let areaM2 = 0, points = State.notesCount || 0;
-      drawnItems.eachLayer(l => {
-        if (l instanceof L.Polygon) {
-          const ring = l.getLatLngs()[0];
-          areaM2 += L.GeometryUtil.geodesicArea(ring);
-          points += ring.length;
-        } else if (l instanceof L.Polyline) {
-          points += l.getLatLngs().length;
-        } else if (l.getLatLng) {
-          points += 1;
-        }
-      });
-      const { area, points: pointsEl } = els();
-      if (area) area.textContent = `${(areaM2 / 1e6).toFixed(2)} KM²`;
-      if (pointsEl) pointsEl.textContent = points;
-    };
-    return { update };
-  })();
-
   const Draw = (() => {
     const savedNotes = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     const pinGroup = L.layerGroup().addTo(map), pinGroupMini = L.layerGroup().addTo(mini);
-    map.pm.addControls({ drawMarker:false, drawPolygon:false, drawPolyline:false, editMode:false, dragMode:false, cutPolygon:false, removalMode:false });
 
     const renderNotes = () => {
       pinGroup.clearLayers(); pinGroupMini.clearLayers();
@@ -215,7 +181,7 @@
         L.marker([p.lat, p.lng]).addTo(pinGroup).bindPopup(`<b>📍 Note</b><br>${p.text}<button class="p-nav" style="background:#0b8043;" onclick="GIS.Draw.navigateExternal(${p.lat}, ${p.lng})">Navigate</button><button class="p-del" onclick="GIS.Draw._deleteNote(${i})">Delete</button>`);
         L.marker([p.lat, p.lng]).addTo(pinGroupMini);
       });
-      State.notesCount = savedNotes.length; Stats.update();
+      State.notesCount = savedNotes.length;
     }; renderNotes();
 
     const clearHighlights = () => ['lineBtn','polygonBtn','markerBtn'].forEach(id => { document.getElementById(id)?.classList.remove('on-accent'); });
@@ -224,14 +190,14 @@
       if (State.editMode) toggleEdit(); if (State.eraseMode) toggleErase(); if (State.routeMode) toggleRouteMode();
       const wasActive = map.pm.GlobalDrawMode === toolType; clearHighlights();
       if (wasActive) { map.pm.disableDraw(); State.activeTool=null; }
-      else { map.pm.enableDraw(toolType, { hintMarkerStyle: { opacity: 0, fillOpacity: 0 } }); const id = { Line:'lineBtn', Polygon:'polygonBtn', Marker:'markerBtn' }[toolType]; document.getElementById(id).classList.add('on-accent'); State.activeTool = toolType.toUpperCase(); }
-      updateStatus(); showUI();
+      else { map.pm.enableDraw(toolType, { hintMarkerStyle: { opacity: 0, fillOpacity: 0 } }); const id = { Line:'lineBtn', Polygon:'polygonBtn', Marker:'markerBtn' }[toolType]; document.getElementById(id)?.classList.add('on-accent'); State.activeTool = toolType.toUpperCase(); }
+      updateStatus();
     };
 
     map.on('pm:globaldrawmodetoggled', e => { if (!e.enabled) clearHighlights(); });
     let workingLayerMini = null;
     map.on('pm:drawstart', (e) => {
-      State.drawing = true; showUI();
+      State.drawing = true;
       if (e.workingLayer) {
         if (workingLayerMini) mini.removeLayer(workingLayerMini);
         const shape = map.pm.Draw.getActiveShape(), style = { color: '#FF9933', weight: 4, dashArray: '5, 5' };
@@ -247,7 +213,7 @@
       if (shape === 'Marker') {
         const txt = prompt('Save Note:');
         if (txt) { savedNotes.push({ lat:layer.getLatLng().lat, lng:layer.getLatLng().lng, text:txt }); localStorage.setItem(STORAGE_KEY, JSON.stringify(savedNotes)); renderNotes(); Toast.show('Note saved', 'ok'); }
-        map.removeLayer(layer); document.getElementById('markerBtn').classList.remove('on-accent'); State.activeTool=null; updateStatus(); return;
+        map.removeLayer(layer); document.getElementById('markerBtn')?.classList.remove('on-accent'); State.activeTool=null; updateStatus(); return;
       }
       drawnItems.addLayer(layer);
       if (shape === 'Polygon' || shape === 'Rectangle') {
@@ -271,24 +237,23 @@
       const origId = L.stamp(layer); const style = { color: '#FF9933', fillColor: '#FF9933', fillOpacity: 0.15, weight: layer.options.weight || 2.5 };
       let miniL; if (shape === 'Line') miniL = L.polyline(layer.getLatLngs(), { color: '#FF9933', weight: layer.options.weight || 3 }).addTo(drawnItemsMini); else miniL = L.polygon(layer.getLatLngs(), style).addTo(drawnItemsMini);
       if (miniL) { vectorSync[origId] = L.stamp(miniL); layer.on('pm:edit pm:markerdrag', () => { const ml = drawnItemsMini.getLayer(vectorSync[L.stamp(layer)]); if (ml) ml.setLatLngs(layer.getLatLngs()); }); }
-      document.getElementById('lineBtn').classList.remove('on-accent'); document.getElementById('polygonBtn').classList.remove('on-accent'); State.activeTool=null; updateStatus();
-      Stats.update();
+      document.getElementById('lineBtn')?.classList.remove('on-accent'); document.getElementById('polygonBtn')?.classList.remove('on-accent'); State.activeTool=null; updateStatus();
     });
 
-    drawnItems.on('layerremove', e => { const oid = L.stamp(e.layer); const ml = drawnItemsMini.getLayer(vectorSync[oid]); if (ml) drawnItemsMini.removeLayer(ml); delete vectorSync[oid]; Stats.update(); });
+    drawnItems.on('layerremove', e => { const oid = L.stamp(e.layer); const ml = drawnItemsMini.getLayer(vectorSync[oid]); if (ml) drawnItemsMini.removeLayer(ml); delete vectorSync[oid]; });
 
     const toggleErase = () => {
       if (map.pm.GlobalDrawMode) map.pm.disableDraw(); if (State.editMode) toggleEdit(); if (State.routeMode) toggleRouteMode();
       map.pm.toggleGlobalRemovalMode(); State.eraseMode = map.pm.globalRemovalModeEnabled(); const btn = document.getElementById('eraseModeBtn');
-      if (State.eraseMode) { btn.classList.add('on-accent'); State.activeTool='ERASE'; Toast.show('Tap shape to erase', 'warn'); } 
-      else { btn.classList.remove('on-accent'); State.activeTool=null; } updateStatus(); showUI();
+      if (State.eraseMode) { btn?.classList.add('on-accent'); State.activeTool='ERASE'; Toast.show('Tap shape to erase', 'warn'); } 
+      else { btn?.classList.remove('on-accent'); State.activeTool=null; } updateStatus();
     };
 
     const toggleEdit = () => {
       if (map.pm.GlobalDrawMode) map.pm.disableDraw(); if (State.eraseMode) toggleErase(); if (State.routeMode) toggleRouteMode();
       map.pm.toggleGlobalEditMode(); State.editMode = map.pm.globalEditModeEnabled(); const btn = document.getElementById('editBtn');
-      if (State.editMode) { btn.classList.add('on-accent'); State.activeTool='EDIT'; Toast.show('Drag nodes to reshape', 'info'); } 
-      else { btn.classList.remove('on-accent'); State.activeTool=null; } updateStatus(); showUI();
+      if (State.editMode) { btn?.classList.add('on-accent'); State.activeTool='EDIT'; Toast.show('Drag nodes to reshape', 'info'); } 
+      else { btn?.classList.remove('on-accent'); State.activeTool=null; } updateStatus();
     };
 
     const clearAll = async () => {
@@ -296,15 +261,15 @@
       drawnItems.clearLayers(); drawnItemsMini.clearLayers(); Object.keys(vectorSync).forEach(k => delete vectorSync[k]);
       map.eachLayer(l => { if (l.pm && l instanceof L.Path) map.removeLayer(l); });
       if (State.eraseMode) toggleErase(); if (State.editMode) toggleEdit();
-      Toast.show('Cleared', 'ok'); showUI(); Stats.update();
+      Toast.show('Cleared', 'ok');
     };
 
     const toggleRouteMode = () => {
       if (map.pm.GlobalDrawMode) map.pm.disableDraw(); if (State.editMode) toggleEdit(); if (State.eraseMode) toggleErase();
       State.routeMode = !State.routeMode; const btn = document.getElementById('routeModeBtn');
-      if (State.routeMode) { btn.classList.add('on-accent'); State.activeTool='NAVIGATE'; Toast.show('Tap map to navigate', 'info'); } 
-      else { btn.classList.remove('on-accent'); State.activeTool=null; }
-      updateStatus(); showUI();
+      if (State.routeMode) { btn?.classList.add('on-accent'); State.activeTool='NAVIGATE'; Toast.show('Tap map to navigate', 'info'); } 
+      else { btn?.classList.remove('on-accent'); State.activeTool=null; }
+      updateStatus();
     };
 
     const navigateExternal = (lat, lng) => {
@@ -331,10 +296,10 @@
         } else { Toast.show('Provide JPG/PNG/PDF', 'warn'); return; }
       } catch (err) { Toast.show(`Error: ${err.message}`, 'error'); return; }
       const c = map.getCenter(); lat = c.lat; lng = c.lng; angle = 0; w = 0.0025; h = 0.0025; render();
-      document.getElementById('fmbTools').style.display = 'flex'; Toast.show('FMB loaded', 'ok'); showUI();
+      GIS.UI.showRibbonPage('fmb'); GIS.UI.openRibbon(); Toast.show('FMB loaded', 'ok');
     });
 
-    const changeOpacity = (val) => { currentOpacity = Math.max(0.1, Math.min(1.0, currentOpacity + val)); if(overlay) overlay.setOpacity(currentOpacity); if(overlayMini) overlayMini.setOpacity(currentOpacity); showUI(); };
+    const changeOpacity = (val) => { currentOpacity = Math.max(0.1, Math.min(1.0, currentOpacity + val)); if(overlay) overlay.setOpacity(currentOpacity); if(overlayMini) overlayMini.setOpacity(currentOpacity); };
 
     const render = () => {
       if (!imgData) return; const bounds = L.latLngBounds([lat - h/2, lng - w/2], [lat + h/2, lng + w/2]);
@@ -349,23 +314,23 @@
 
     const ACTIONS = { up: () => lat += step(), down: () => lat -= step(), left: () => lng -= step(), right: () => lng += step(), zoomin: () => { w*=1.05; h*=1.05; }, zoomout: () => { w*=0.95; h*=0.95; }, rotL: () => angle -= 1.5, rotR: () => angle += 1.5, opPlus: () => changeOpacity(0.1), opMinus: () => changeOpacity(-0.1) };
     const step = () => 0.000015 * Math.max(1, 22 - map.getZoom());
-    const adjust = action => { if (!overlay) return; ACTIONS[action]?.(); render(); showUI(); };
+    const adjust = action => { if (!overlay) return; ACTIONS[action]?.(); render(); };
     const remove = async () => {
       if (!overlay) return; const ok = await Modal.confirm('Remove FMB?'); if (!ok) return;
-      map.removeLayer(overlay); overlay = null; mini.removeLayer(overlayMini); overlayMini = null; imgData = ''; document.getElementById('fmbTools').style.display = 'none';
-      if (State.touchMove) toggleTouch(); Toast.show('FMB removed', 'info'); showUI();
+      map.removeLayer(overlay); overlay = null; mini.removeLayer(overlayMini); overlayMini = null; imgData = '';
+      if (State.touchMove) toggleTouch(); Toast.show('FMB removed', 'info'); GIS.UI.showRibbonPage('main');
     };
 
     const toggleTouch = () => {
       if (map.pm.GlobalDrawMode) map.pm.disableDraw(); State.touchMove = !State.touchMove; const btn = document.getElementById('touchMoveBtn');
-      if (State.touchMove) { map.dragging.disable(); map.touchZoom.disable(); btn.classList.add('on-accent'); State.activeTool='MOVE FMB'; } 
-      else { map.dragging.enable(); map.touchZoom.enable(); btn.classList.remove('on-accent'); State.activeTool=null; }
-      updateStatus(); showUI();
+      if (State.touchMove) { map.dragging.disable(); map.touchZoom.disable(); btn?.classList.add('on-accent'); State.activeTool='MOVE FMB'; } 
+      else { map.dragging.enable(); map.touchZoom.enable(); btn?.classList.remove('on-accent'); State.activeTool=null; }
+      updateStatus();
     };
 
     const mc = map.getContainer();
     mc.addEventListener('touchstart', e => {
-      if (!State.touchMove || !overlay) return; e.preventDefault(); showUI();
+      if (!State.touchMove || !overlay) return; e.preventDefault();
       if (e.touches.length === 1) { touchStart = { x:e.touches[0].clientX, y:e.touches[0].clientY }; startLat = lat; startLng = lng; } 
       else if (e.touches.length === 2) {
         pinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
@@ -374,7 +339,7 @@
     }, { passive:false });
 
     mc.addEventListener('touchmove', e => {
-      if (!State.touchMove || !overlay) return; e.preventDefault(); showUI();
+      if (!State.touchMove || !overlay) return; e.preventDefault();
       if (e.touches.length === 1 && touchStart) {
         const p = map.latLngToContainerPoint([startLat, startLng]);
         const nl = map.containerPointToLatLng(L.point(p.x+(e.touches[0].clientX-touchStart.x), p.y+(e.touches[0].clientY-touchStart.y))); lat = nl.lat; lng = nl.lng;
@@ -388,15 +353,14 @@
     mc.addEventListener('touchend', () => { touchStart = null; pinchDist = 0; }, { passive:false });
 
     let mouseStart = null;
-    mc.addEventListener('mousedown', e => { if (!State.touchMove || !overlay || e.button!==0) return; e.preventDefault(); mouseStart = { x:e.clientX, y:e.clientY }; startLat = lat; startLng = lng; showUI(); });
-    document.addEventListener('mousemove', e => { if (!State.touchMove || !overlay || !mouseStart) return; e.preventDefault(); const p = map.latLngToContainerPoint([startLat, startLng]); const nl = map.containerPointToLatLng(L.point(p.x+(e.clientX-mouseStart.x), p.y+(e.clientY-mouseStart.y))); lat = nl.lat; lng = nl.lng; render(); showUI(); });
+    mc.addEventListener('mousedown', e => { if (!State.touchMove || !overlay || e.button!==0) return; e.preventDefault(); mouseStart = { x:e.clientX, y:e.clientY }; startLat = lat; startLng = lng; });
+    document.addEventListener('mousemove', e => { if (!State.touchMove || !overlay || !mouseStart) return; e.preventDefault(); const p = map.latLngToContainerPoint([startLat, startLng]); const nl = map.containerPointToLatLng(L.point(p.x+(e.clientX-mouseStart.x), p.y+(e.clientY-mouseStart.y))); lat = nl.lat; lng = nl.lng; render(); });
     document.addEventListener('mouseup', () => mouseStart = null);
-    mc.addEventListener('wheel', e => { if (!State.touchMove || !overlay) return; e.preventDefault(); if (e.deltaY < 0) { w*=1.03; h*=1.03; } else { w*=0.97; h*=0.97; } render(); showUI(); }, { passive: false });
+    mc.addEventListener('wheel', e => { if (!State.touchMove || !overlay) return; e.preventDefault(); if (e.deltaY < 0) { w*=1.03; h*=1.03; } else { w*=0.97; h*=0.97; } render(); }, { passive: false });
     
     return { adjust, remove, toggleTouch, getGeoRef: () => overlay ? { lat, lng, w, h, angle } : null, getImageData: () => overlay ? imgData : null };
   })();
 
-  /* ── KMZ IO LOGIC ── */
   const IO = (() => {
     const dataURLtoBlob = (dataURL) => {
       const arr = dataURL.split(','); const mime = arr[0].match(/:(.*?);/)[1]; const bstr = atob(arr[1]);
@@ -484,13 +448,16 @@
     };
   })();
 
-  // Attach listener to file input
   document.getElementById('uploadFile').addEventListener('change', e => {
     const file = e.target.files[0];
     if (file) { GIS.IO.uploadFile(file); e.target.value = ''; document.getElementById('exportMenu').classList.remove('active'); }
   });
 
+  // Auto-close tools and menus when map is touched/clicked
   map.on('click', e => { 
+    UI.closeRibbon();
+    document.getElementById('exportMenu')?.classList.remove('active');
+
     if (State.routeMode) {
       GIS.Draw.navigateExternal(e.latlng.lat, e.latlng.lng);
       GIS.Draw.toggleRouteMode();
@@ -516,11 +483,11 @@
       toggle() {
         if (!SR) { Toast.show('Voice search not supported', 'warn'); return; }
         if (listening) { rec.stop(); listening = false; return; }
-        listening = true; document.getElementById('micBtn')?.classList.add('on-accent'); rec.start(); showUI();
+        listening = true; document.getElementById('micBtn')?.classList.add('on-accent'); rec.start();
       }
     };
   })();
 
-  window.GIS = { Layers, Search, GPS, Draw, FMB, UI, IO, Stats, MapCtrl, Voice };
+  window.GIS = { Layers, Search, GPS, Draw, FMB, UI, IO, MapCtrl, Voice };
 
 })();
