@@ -7,7 +7,7 @@
   const STORAGE_KEY   = 'murali_gis_v12';
   const BHUVAN_URL    = 'https://bhuvan-panchayat3.nrsc.gov.in/geoserver/gwc/service/wms';
   const KSREC_URL     = 'https://ksrec.in/geoserver/Kerala/wms';
-  const DEFAULT_VIEW  = { lat: 11.196, lng: 76.227, zoom: 16 };
+  const DEFAULT_VIEW  = { lat: 11.2270173, lng: 76.2150992, zoom: 17 };
 
   const State = { drawing: false, eraseMode: false, editMode: false, touchMove: false, routeMode: false, userLatLng: null, activeLayer: 'Hybrid', activeTool: null, notesCount: 0 };
 
