@@ -1,196 +1,248 @@
 :root {
-  --bg-dark: #0f172a;
-  --panel-bg: rgba(15, 23, 42, 0.85);
-  --border-color: #334155;
-  --accent-color: #38bdf8;
-  --red: #ef4444;
-  --green: #22c55e;
-  --text-light: #f8fafc;
+  --bg:          #07090e;
+  --surface:     rgba(10,13,20,0.96);
+  --surface-2:   rgba(255,255,255,0.08);
+  --surface-3:   rgba(255,255,255,0.15);
+  --border:      rgba(255,255,255,0.1);
+  --border-hi:   rgba(255,255,255,0.2);
+  --accent:      #e55c00;
+  --saffron:     #FF9933; 
+  --green:       #16a34a;
+  --red:         #dc2626;
+  --blue:        #2563eb;
+  --blue-light:  #60a5fa;
+  --text:        #dde4ef;
+  --text-dim:    #8899b0;
+  --font:        'Syne', sans-serif;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  font-family: 'Syne', sans-serif;
-  user-select: none;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width:100%; height:100%; background:var(--bg); font-family:var(--font); color:var(--text); overflow:hidden; }
 
-html, body, #map {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: var(--bg-dark);
-}
+#map { position:absolute; top:0; bottom:0; left:0; right:0; z-index:1; }
 
-/* WMS Raster Survey Numbers High-Contrast Black Filter */
-.wms-black-layer {
-  filter: grayscale(100%) contrast(350%) brightness(0.15) !important;
-}
+/* Hide default Geoman and Leaflet Draw toolbars */
+.leaflet-pm-toolbar, .leaflet-draw-toolbar, .leaflet-pm-tooltip { display: none !important; }
 
-/* TOPBAR */
+/* TOP SEARCH BAR */
 .topbar {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  right: 12px;
-  z-index: 1000;
-  display: flex;
-  gap: 8px;
+  position: absolute; top: 12px; left: 12px; right: 12px; z-index: 2800;
+  display: flex; align-items: center; gap: 8px; pointer-events: none;
 }
-
-.more-btn, .searchbar {
-  background: var(--panel-bg);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  color: var(--text-light);
-}
-
-.more-btn {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 18px;
-}
+.topbar > * { pointer-events: auto; }
 
 .searchbar {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px;
+  background: var(--surface); border: 1px solid var(--border-hi); border-radius: 14px;
+  padding: 4px 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); backdrop-filter: blur(8px);
 }
+.search-icon { color: var(--saffron); font-size: 14px; margin-left: 4px; }
+.searchbar input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--text); font-size: 13px; padding: 8px 4px; }
+.searchbar input::placeholder { color: var(--text-dim); }
+#micBtn { background: none; color: var(--text-dim); border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; flex-shrink: 0; }
+#micBtn.on-accent { color: var(--saffron); }
+#searchBtn { background: var(--accent); color: #fff; border: none; width: 32px; height: 32px; border-radius: 10px; cursor: pointer; flex-shrink: 0; }
 
-.searchbar input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: var(--text-light);
-  padding: 10px;
-  outline: none;
-  font-size: 13px;
+.more-btn {
+  width: 44px; height: 44px; border-radius: 14px; flex-shrink: 0;
+  background: var(--blue); color: #fff; border: none; font-size: 17px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37,99,235,0.5); transition: transform 0.2s;
 }
-
-.searchbar button {
-  background: transparent;
-  border: none;
-  color: var(--accent-color);
-  cursor: pointer;
-  font-size: 16px;
-}
+.more-btn:active { transform: scale(0.92); }
 
 /* VERTICAL TOOL RIBBON */
 .tool-ribbon {
-  position: absolute;
-  top: 68px;
-  left: 12px;
-  z-index: 1000;
-  background: var(--panel-bg);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
+  position: absolute; top: 68px; left: 12px; z-index: 2900; width: 54px; max-height: 75vh;
+  background: var(--surface); border: 1px solid var(--border-hi); border-radius: 16px;
+  padding: 8px 6px; overflow-y: auto; overflow-x: hidden; box-shadow: 0 10px 32px rgba(0,0,0,0.7);
+  backdrop-filter: blur(10px); opacity: 0; visibility: hidden; transform: translateX(-15px); pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+  scrollbar-width: none;
 }
+.tool-ribbon::-webkit-scrollbar { display: none; }
+.tool-ribbon.open { opacity: 1; visibility: visible; transform: translateX(0); pointer-events: auto; }
 
-.ribbon-page {
-  display: none;
-  flex-direction: column;
-  gap: 6px;
-}
+.ribbon-page { display: none; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
+.ribbon-page.active { display: flex; }
 
-.ribbon-page.active {
-  display: flex;
-}
+.rb-divider { width: 60%; height: 1px; background: var(--border); margin: 4px 0; flex-shrink: 0; }
 
 .mb {
-  width: 42px;
-  height: 42px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  color: var(--text-light);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 15px;
+  width: 40px; height: 40px; min-width: 40px; background: var(--surface-3); color: var(--text);
+  border: 1px solid var(--border-hi); border-radius: 10px; padding: 0;
+  font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0; text-transform: uppercase; white-space: nowrap;
+}
+.mb:active { transform: scale(0.92); }
+.mb.back-btn { background: var(--surface-2); color: var(--saffron); border-color: var(--saffron); }
+.mb.on-saffron { background: var(--saffron)!important; color: #fff!important; border-color: #e68a2e!important; }
+.mb.on-accent { background: var(--accent)!important; color: #fff!important; border-color: var(--accent)!important; }
+.mb.on-green { background: var(--green)!important; color: #fff!important; border-color: var(--green)!important; }
+
+/* Base map tiles */
+.basetile { padding: 0; border-radius: 10px; overflow: hidden; }
+.basetile > span { display: block; width: 100%; height: 100%; }
+.bt-hybrid { background: linear-gradient(135deg, #234d2c, #0e2a1a 60%, #1a3a23); }
+.bt-road { background: linear-gradient(135deg, #3a4657, #232c38 60%, #2d3948); }
+.bt-osm { background: linear-gradient(135deg, #d9cfa8, #b8ac7c 60%, #cabf94); }
+
+/* Status Overlay */
+#statusText {
+  position: absolute; top: 68px; right: 12px; z-index: 2000;
+  background: rgba(10,13,20,0.85); padding: 5px 12px; border-radius: 8px;
+  font-size: 10px; font-weight: 800; color: var(--saffron); border: 1px solid var(--border);
+  pointer-events: none; text-transform: uppercase; letter-spacing: 1px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+
+/* ── BOTTOM RIGHT FAB CONTROLS ── */
+.fab-stack {
+  position: absolute; bottom: 20px; right: 12px; z-index: 2800;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+}
+.fab-pill {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--border-hi);
+  color: var(--text); font-family: var(--font); font-size: 12px; font-weight: 700;
+  cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.5); backdrop-filter: blur(8px);
   transition: all 0.2s ease;
 }
+.fab-pill i { color: var(--saffron); font-size: 15px; }
 
-.mb:active {
-  transform: scale(0.92);
-  background: var(--accent-color);
-  color: #000;
+/* Icon Only Button Style */
+.fab-pill.icon-only {
+  width: 46px; height: 46px; padding: 0; border-radius: 50%;
+}
+.fab-pill#gpsBtn.on-blue {
+  background: var(--blue) !important;
+  border-color: var(--blue-light) !important;
+  box-shadow: 0 0 16px rgba(37, 99, 235, 0.7);
+}
+.fab-pill#gpsBtn.on-blue i {
+  color: #ffffff !important;
 }
 
-.mb.on-green {
-  color: var(--green);
-}
-
-.rb-divider {
-  height: 1px;
-  background: var(--border-color);
-  margin: 2px 0;
-}
-
-/* STEP SELECT DROPDOWNS */
-.step-select {
-  width: 42px;
-  height: 32px;
-  background: #1e293b;
-  color: var(--accent-color);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 9px;
-  font-weight: 700;
-  text-align: center;
-  padding: 0;
-  outline: none;
-  cursor: pointer;
-}
-
-.step-select option {
-  background: #0f172a;
-  color: #fff;
+/* Blue Point Marker styling */
+.blue-dot-container { display:flex!important; align-items:center!important; justify-content:center!important; position:relative!important; }
+.blue-dot {
+  width: 16px; height: 16px;
+  background: var(--blue);
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.9);
 }
 
 /* ZOOM CONTROLS */
-.zoom-ctrl {
-  position: absolute;
-  bottom: 24px;
-  right: 12px;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.zoom-ctrl { position: absolute; right: 12px; bottom: 140px; z-index: 2800; display: flex; flex-direction: column; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.5); }
+.zoom-ctrl button { width: 40px; height: 40px; background: var(--surface); border: 1px solid var(--border-hi); color: var(--text); font-size: 15px; cursor: pointer; }
+.zoom-ctrl button:first-child { border-bottom: none; border-radius: 12px 12px 0 0; }
+.zoom-ctrl button:last-child { border-radius: 0 0 12px 12px; }
+
+/* Export Menu */
+.export-menu {
+  position: absolute; bottom: 80px; right: 12px; z-index: 2850;
+  background: rgba(10, 13, 20, 0.95); backdrop-filter: blur(8px); border: 1px solid var(--border-hi);
+  border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.8); opacity: 0; visibility: hidden; pointer-events: none;
+  transition: all 0.2s ease; transform: translateY(10px);
+}
+.export-menu.active { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
+.btn { display:flex; align-items:center; justify-content:flex-start; gap:8px; border:none; border-radius:6px; padding:10px 12px; font-size:11px; font-weight:700; text-transform:uppercase; cursor:pointer; white-space: nowrap; }
+.btn-export { background:var(--accent); color:#fff; }
+.btn-import { background:var(--surface-3); color:var(--text); border:1px solid var(--border-hi); }
+
+.leaflet-popup-content-wrapper { background:var(--surface); border:1px solid var(--border-hi); border-radius:8px; color:var(--text); font-size:12px; }
+.leaflet-popup-tip { background:var(--surface); }
+.p-nav, .p-del { display:block; width:100%; margin-top:6px; padding:6px; border:none; border-radius:4px; font-size:10px; font-weight:700; text-transform:uppercase; color:#fff; cursor: pointer;}
+
+/* Orange/Terracotta Recolor for Survey lines & Survey Numbers */
+.parcel-orange { filter: url(#orangeRecolor); opacity: 0.95; }
+
+#toast-root { position:fixed; bottom:20px; right:10px; z-index:9999; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+.toast { display:flex; gap:10px; background:var(--surface); border:1px solid var(--border-hi); border-radius:6px; padding:10px 14px; border-left:3px solid var(--accent); transition: opacity 0.3s; }
+.toast.ok { border-left-color:var(--green); } .toast.info { border-left-color:var(--blue); } .toast.warn { border-left-color:#fbbf24; }
+.toast-msg { font-size:11px; color:var(--text); font-weight: 600; }
+.toast.out { opacity:0; }
+
+.modal-backdrop { position:fixed; inset:0; z-index:9998; background:rgba(0,0,0,.7); display:none; align-items:center; justify-content:center; }
+.modal-backdrop.open { display:flex; }
+.modal { background:var(--surface); border-radius:8px; padding:20px; width:80%; max-width:300px; border:1px solid var(--border-hi); }
+.modal-title { font-size:14px; font-weight:700; margin-bottom:10px; }
+.modal-body { font-size:12px; color:var(--text-dim); margin-bottom:20px; }
+.modal-actions { display:flex; gap:10px; justify-content:flex-end; }
+.modal-btn { padding:8px 16px; border-radius:4px; font-weight:700; cursor:pointer; font-size:11px; border:none;}
+.modal-btn.cancel { background:var(--surface-3); color:var(--text); } .modal-btn.confirm { background:var(--red); color:#fff; }
+
+/* FMB step selectors (accurate move + rotation) */
+.mb-select {
+  width: 40px; min-width: 40px; height: 30px; flex-shrink: 0;
+  background: var(--surface-3); color: var(--text); border: 1px solid var(--border-hi);
+  border-radius: 8px; font-family: var(--font); font-size: 8px; font-weight: 800;
+  text-align: center; text-align-last: center; outline: none; cursor: pointer;
+  appearance: none; -webkit-appearance: none; padding: 2px 1px;
+}
+.mb-select:focus { border-color: var(--saffron); }
+
+/* Black survey lines & numbers with white buffer (halo) */
+.parcel-ink { filter: url(#surveyInk); opacity: 0.95; }
+
+
+/* FMB step control labels — clearly visible headers */
+.mb-label {
+  width: 100%; text-align: center; font-size: 8px; font-weight: 800;
+  letter-spacing: 1px; color: #07090e; background: var(--saffron);
+  border-radius: 6px; padding: 3px 0; flex-shrink: 0; margin-top: 2px;
 }
 
-.zoom-ctrl button {
-  width: 42px;
-  height: 42px;
-  background: var(--panel-bg);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  color: var(--text-light);
-  font-size: 16px;
-  cursor: pointer;
+/* Step selectors — distinct background + font colours per control */
+.mb-select {
+  width: 44px; min-width: 44px; height: 32px; flex-shrink: 0;
+  background: var(--saffron); color: #07090e; border: 1px solid #e68a2e;
+  border-radius: 8px; font-family: var(--font); font-size: 9px; font-weight: 800;
+  text-align: center; text-align-last: center; outline: none; cursor: pointer;
+  appearance: none; -webkit-appearance: none; padding: 2px 1px;
 }
+.mb-select option { background: #07090e; color: var(--saffron); font-weight: 700; }
+.mb-select.rot { background: var(--accent); color: #ffffff; border-color: var(--accent); }
+.mb-select.rot option { background: #07090e; color: #ffb37a; }
+.mb-select.zoom { background: var(--green); color: #ffffff; border-color: var(--green); }
+.mb-select.zoom option { background: #07090e; color: #4ade80; }
+.mb-select:focus { box-shadow: 0 0 0 2px rgba(255,153,51,0.6); }
 
-#statusText {
-  position: absolute;
-  bottom: 12px;
-  left: 12px;
-  z-index: 1000;
-  background: var(--panel-bg);
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 11px;
-  color: var(--accent-color);
-  border: 1px solid var(--border-color);
+
+/* FMB step control labels — compact professional icon chips */
+.mb-label {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 4px;
+  font-size: 8px; font-weight: 800; letter-spacing: 1px;
+  color: #07090e; background: var(--saffron);
+  border-radius: 6px; padding: 4px 0; flex-shrink: 0; margin-top: 2px;
+}
+.mb-label i { font-size: 10px; }
+.mb-label.rot { background: var(--accent); color: #ffffff; }
+.mb-label.zoom { background: var(--green); color: #ffffff; }
+
+
+/* FMB step chips as buttons */
+button.mb-label { border: none; cursor: pointer; font-family: var(--font); }
+button.mb-label:active { transform: scale(0.95); }
+
+/* Step slider panel — appears beside the ribbon */
+.step-slider-panel {
+  position: absolute; top: 68px; left: 74px; z-index: 2950; width: 190px;
+  background: var(--surface); border: 1px solid var(--saffron);
+  border-radius: 14px; padding: 12px 14px 10px;
+  box-shadow: 0 10px 32px rgba(0,0,0,0.75); backdrop-filter: blur(10px);
+  opacity: 0; visibility: hidden; transform: translateX(-12px); pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+}
+.step-slider-panel.open { opacity: 1; visibility: visible; transform: translateX(0); pointer-events: auto; }
+.ssp-head { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+.ssp-head i { color: var(--saffron); font-size: 12px; }
+.ssp-title { font-size: 10px; font-weight: 800; letter-spacing: 1.5px; color: var(--saffron); }
+#stepSlider { width: 100%; height: 26px; accent-color: var(--saffron); cursor: pointer; }
+.ssp-scale { display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; color: var(--text-dim); margin: -4px 2px 6px; }
+.ssp-value {
+  text-align: center; font-size: 13px; font-weight: 800; color: #07090e;
+  background: var(--saffron); border-radius: 8px; padding: 5px 0; letter-spacing: 0.5px;
 }
