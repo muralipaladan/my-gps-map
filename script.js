@@ -9,7 +9,7 @@
   const KSREC_URL     = 'https://ksrec.in/geoserver/Kerala/wms';
   const DEFAULT_VIEW  = { lat: 11.2270173, lng: 76.2150992, zoom: 17 };
 
-  const State = { drawing: false, eraseMode: false, editMode: false, touchMove: false, routeMode: false, userLatLng: null, activeLayer: 'Hybrid', activeTool: null, notesCount: 0 };
+  const State = { drawing: false, eraseMode: false, editMode: false, touchMove: false, routeMode: false, snapEnabled: true, userLatLng: null, activeLayer: 'Hybrid', activeTool: null, notesCount: 0 };
 
   const Toast = (() => {
     const root = document.getElementById('toast-root');
@@ -229,11 +229,19 @@
       drawnItems.addLayer(layer);
       if (shape === 'Polygon' || shape === 'Rectangle') {
         layer.setStyle({ color: '#FF9933', fillColor: '#FF9933', fillOpacity: 0.15, weight: 2.5 });
-        const updateAreaPopup = () => { const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]); const popupContent = `<b>Area</b><br>${(area * 0.000247105).toFixed(3)} ac`; if (layer.getPopup()) layer.setPopupContent(popupContent); else layer.bindPopup(popupContent).openPopup(); };
+        const fmtArea = (sqm) => {
+          if (sqm >= 10000) return `${(sqm / 10000).toFixed(4)} ha<br><small>${sqm.toFixed(1)} m²</small>`;
+          return `${sqm.toFixed(1)} m²`;
+        };
+        const updateAreaPopup = () => {
+          const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+          const popupContent = `<b>Area</b><br>${fmtArea(area)}`;
+          if (layer.getPopup()) layer.setPopupContent(popupContent); else layer.bindPopup(popupContent).openPopup();
+        };
         updateAreaPopup(); layer.on('pm:edit pm:markerdragend pm:vertexadded pm:vertexremoved', updateAreaPopup);
       } else if (shape === 'Line') {
         layer.setStyle({ color: '#FF9933', weight: 3 });
-        const fmtLen = (m) => m >= 1000 ? `${(m/1000).toFixed(3)} km` : `${m.toFixed(1)} m`;
+        const fmtLen = (m) => m >= 1000 ? `${(m/1000).toFixed(3)} km` : `${m.toFixed(2)} m`;
         const updateLengthPopup = () => {
           let len = 0;
           try { len = L.GeometryUtil.length(layer); } catch (e) {
@@ -275,6 +283,19 @@
       Toast.show('Cleared', 'ok');
     };
 
+    const toggleSnap = () => {
+      State.snapEnabled = !State.snapEnabled;
+      map.pm.setGlobalOptions({ snappable: State.snapEnabled });
+      const btn = document.getElementById('snapBtn');
+      if (State.snapEnabled) {
+        btn?.classList.add('on-accent');
+        Toast.show('Snap ON', 'ok');
+      } else {
+        btn?.classList.remove('on-accent');
+        Toast.show('Snap OFF', 'info');
+      }
+    };
+
     const toggleRouteMode = () => {
       if (map.pm.GlobalDrawMode) map.pm.disableDraw(); if (State.editMode) toggleEdit(); if (State.eraseMode) toggleErase();
       State.routeMode = !State.routeMode; const btn = document.getElementById('routeModeBtn');
@@ -287,13 +308,127 @@
       window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`, '_blank');
     };
 
-    return { trigger, toggleErase, toggleEdit, clearAll, _deleteNote: i => { savedNotes.splice(i, 1); localStorage.setItem(STORAGE_KEY, JSON.stringify(savedNotes)); renderNotes(); }, toggleRouteMode, navigateExternal };
+    return { trigger, toggleErase, toggleEdit, toggleSnap, clearAll, _deleteNote: i => { savedNotes.splice(i, 1); localStorage.setItem(STORAGE_KEY, JSON.stringify(savedNotes)); renderNotes(); }, toggleRouteMode, navigateExternal };
   })();
 
   const FMB = (() => {
     let overlay = null, overlayMini = null, imgData = '';
     let lat = 0, lng = 0, w = 0.0025, h = 0.0025, angle = 0, currentOpacity = 0.6;
     let touchStart = null, pinchDist = 0, pinchCenter = null; let startLat = 0, startLng = 0, startW = 0, startH = 0;
+    let handleGroup = null, handles = {}, activeHandle = null, handleStart = null;
+
+    // MS-Office style resize handles (8 points: 4 corners + 4 sides)
+    const HANDLE_KEYS = ['nw','n','ne','e','se','s','sw','w'];
+    const HANDLE_CURSORS = { nw:'nwse-resize', n:'ns-resize', ne:'nesw-resize', e:'ew-resize', se:'nwse-resize', s:'ns-resize', sw:'nesw-resize', w:'ew-resize' };
+
+    const ensureHandleGroup = () => {
+      if (!handleGroup) {
+        handleGroup = L.layerGroup().addTo(map);
+      }
+    };
+
+    const clearHandles = () => {
+      if (handleGroup) { handleGroup.clearLayers(); handles = {}; }
+    };
+
+    const makeHandleIcon = (key) => L.divIcon({
+      className: 'fmb-handle',
+      html: `<div class="fmb-handle-dot" data-key="${key}" style="cursor:${HANDLE_CURSORS[key]}"></div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
+    });
+
+    const getHandleLatLngs = () => {
+      const halfW = w / 2, halfH = h / 2;
+      return {
+        nw: [lat + halfH, lng - halfW],
+        n:  [lat + halfH, lng],
+        ne: [lat + halfH, lng + halfW],
+        e:  [lat,         lng + halfW],
+        se: [lat - halfH, lng + halfW],
+        s:  [lat - halfH, lng],
+        sw: [lat - halfH, lng - halfW],
+        w:  [lat,         lng - halfW]
+      };
+    };
+
+    const updateHandles = () => {
+      if (!imgData || !State.touchMove) { clearHandles(); return; }
+      ensureHandleGroup();
+      const pos = getHandleLatLngs();
+      HANDLE_KEYS.forEach(key => {
+        if (handles[key]) {
+          handles[key].setLatLng(pos[key]);
+        } else {
+          const m = L.marker(pos[key], {
+            icon: makeHandleIcon(key),
+            draggable: true,
+            zIndexOffset: 1000,
+            interactive: true
+          }).addTo(handleGroup);
+          m._handleKey = key;
+          m.on('dragstart', onHandleDragStart);
+          m.on('drag', onHandleDrag);
+          m.on('dragend', onHandleDragEnd);
+          handles[key] = m;
+        }
+      });
+    };
+
+    const onHandleDragStart = (e) => {
+      activeHandle = e.target._handleKey;
+      handleStart = { lat, lng, w, h };
+      map.dragging.disable();
+    };
+
+    const onHandleDrag = (e) => {
+      if (!activeHandle || !handleStart) return;
+      const ll = e.target.getLatLng();
+      const s = handleStart;
+      const key = activeHandle;
+
+      // Opposite side stays fixed (MS Office style)
+      let north = s.lat + s.h / 2;
+      let south = s.lat - s.h / 2;
+      let east  = s.lng + s.w / 2;
+      let west  = s.lng - s.w / 2;
+
+      if (key.includes('n')) north = ll.lat;
+      if (key.includes('s')) south = ll.lat;
+      if (key.includes('e')) east  = ll.lng;
+      if (key.includes('w')) west  = ll.lng;
+
+      // Prevent collapse / flip
+      const minSize = 0.00005;
+      if (north - south < minSize) {
+        if (key.includes('n')) north = south + minSize;
+        else south = north - minSize;
+      }
+      if (east - west < minSize) {
+        if (key.includes('e')) east = west + minSize;
+        else west = east - minSize;
+      }
+
+      lat = (north + south) / 2;
+      lng = (east + west) / 2;
+      h = north - south;
+      w = east - west;
+
+      // Re-render overlay without destroying handles
+      renderOverlayOnly();
+      // Keep other handles in sync
+      const pos = getHandleLatLngs();
+      HANDLE_KEYS.forEach(k => {
+        if (k !== key && handles[k]) handles[k].setLatLng(pos[k]);
+      });
+    };
+
+    const onHandleDragEnd = () => {
+      activeHandle = null;
+      handleStart = null;
+      if (!State.touchMove) map.dragging.enable();
+      render(); // full re-render to keep mini in sync
+    };
 
     document.getElementById('uploadFMB').addEventListener('change', async e => {
       const file = e.target.files[0]; if (!file) return; e.target.value = '';
@@ -306,14 +441,29 @@
           imgData = await new Promise((res, rej) => { const r = new FileReader(); r.onload = ev => res(ev.target.result); r.onerror = rej; r.readAsDataURL(file); });
         } else { Toast.show('Provide JPG/PNG/PDF', 'warn'); return; }
       } catch (err) { Toast.show(`Error: ${err.message}`, 'error'); return; }
-      const c = map.getCenter(); lat = c.lat; lng = c.lng; angle = 0; w = 0.0025; h = 0.0025; render();
-      GIS.UI.showRibbonPage('fmb'); GIS.UI.openRibbon(); Toast.show('FMB loaded', 'ok');
+      const c = map.getCenter(); lat = c.lat; lng = c.lng; angle = 0; w = 0.0025; h = 0.0025;
+      render();
+      GIS.UI.showRibbonPage('fmb'); GIS.UI.openRibbon();
+      if (!State.touchMove) toggleTouch();
+      Toast.show('FMB loaded — drag corners/sides to resize', 'ok');
     });
 
     const changeOpacity = (val) => { currentOpacity = Math.max(0.1, Math.min(1.0, currentOpacity + val)); if(overlay) overlay.setOpacity(currentOpacity); if(overlayMini) overlayMini.setOpacity(currentOpacity); };
 
+    const renderOverlayOnly = () => {
+      if (!imgData) return;
+      const bounds = L.latLngBounds([lat - h/2, lng - w/2], [lat + h/2, lng + w/2]);
+      if (overlay) map.removeLayer(overlay);
+      const mkSvg = () => {
+        const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('xmlns', ns); svg.setAttribute('viewBox', '0 0 100 100');
+        const img = document.createElementNS(ns, 'image'); img.setAttribute('width','100'); img.setAttribute('height','100'); img.setAttributeNS('http://www.w3.org/1999/xlink','href',imgData); img.setAttribute('href', imgData); img.setAttribute('transform', `rotate(${angle} 50 50)`); svg.appendChild(img); return svg;
+      };
+      overlay = L.svgOverlay(mkSvg(), bounds, { pane:'overlayPane', opacity:currentOpacity, interactive:false }).addTo(map);
+    };
+
     const render = () => {
-      if (!imgData) return; const bounds = L.latLngBounds([lat - h/2, lng - w/2], [lat + h/2, lng + w/2]);
+      if (!imgData) return;
+      const bounds = L.latLngBounds([lat - h/2, lng - w/2], [lat + h/2, lng + w/2]);
       if (overlay) map.removeLayer(overlay); if (overlayMini) mini.removeLayer(overlayMini);
       const mkSvg = () => {
         const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('xmlns', ns); svg.setAttribute('viewBox', '0 0 100 100');
@@ -321,6 +471,7 @@
       };
       overlay = L.svgOverlay(mkSvg(), bounds, { pane:'overlayPane', opacity:currentOpacity, interactive:false }).addTo(map);
       overlayMini = L.svgOverlay(mkSvg(), bounds, { opacity:currentOpacity, interactive:false }).addTo(mini);
+      updateHandles();
     };
 
     // Step values set by the slider panel (MOVE / ZOOM / ROT chips)
@@ -379,14 +530,25 @@
     const remove = async () => {
       if (!overlay) return; const ok = await Modal.confirm('Remove FMB?'); if (!ok) return;
       map.removeLayer(overlay); overlay = null; mini.removeLayer(overlayMini); overlayMini = null; imgData = '';
+      clearHandles();
       if (State.touchMove) toggleTouch(); Toast.show('FMB removed', 'info'); GIS.UI.showRibbonPage('main');
     };
 
     const toggleTouch = () => {
       if (map.pm.GlobalDrawMode) map.pm.disableDraw(); State.touchMove = !State.touchMove; const btn = document.getElementById('touchMoveBtn');
-      if (State.touchMove) { map.dragging.disable(); map.touchZoom.disable(); btn?.classList.add('on-accent'); State.activeTool='MOVE FMB'; } 
-      else { map.dragging.enable(); map.touchZoom.enable(); btn?.classList.remove('on-accent'); State.activeTool=null; }
+      if (State.touchMove) {
+        map.dragging.disable(); map.touchZoom.disable();
+        btn?.classList.add('on-accent');
+        State.activeTool = 'ADJUST FMB';
+        Toast.show('Drag image or handles to move/resize', 'info');
+      } else {
+        map.dragging.enable(); map.touchZoom.enable();
+        btn?.classList.remove('on-accent');
+        State.activeTool = null;
+        clearHandles();
+      }
       updateStatus();
+      updateHandles();
     };
 
     const mc = map.getContainer();
@@ -414,10 +576,29 @@
     mc.addEventListener('touchend', () => { touchStart = null; pinchDist = 0; }, { passive:false });
 
     let mouseStart = null;
-    mc.addEventListener('mousedown', e => { if (!State.touchMove || !overlay || e.button!==0) return; e.preventDefault(); mouseStart = { x:e.clientX, y:e.clientY }; startLat = lat; startLng = lng; });
-    document.addEventListener('mousemove', e => { if (!State.touchMove || !overlay || !mouseStart) return; e.preventDefault(); const p = map.latLngToContainerPoint([startLat, startLng]); const nl = map.containerPointToLatLng(L.point(p.x+(e.clientX-mouseStart.x), p.y+(e.clientY-mouseStart.y))); lat = nl.lat; lng = nl.lng; render(); });
-    document.addEventListener('mouseup', () => mouseStart = null);
-    mc.addEventListener('wheel', e => { if (!State.touchMove || !overlay) return; e.preventDefault(); if (e.deltaY < 0) { w*=1.03; h*=1.03; } else { w*=0.97; h*=0.97; } render(); }, { passive: false });
+    mc.addEventListener('mousedown', e => {
+      if (!State.touchMove || !overlay || e.button !== 0 || activeHandle) return;
+      // Ignore clicks on resize handles
+      if (e.target && (e.target.classList?.contains('fmb-handle-dot') || e.target.closest?.('.fmb-handle'))) return;
+      e.preventDefault();
+      mouseStart = { x: e.clientX, y: e.clientY };
+      startLat = lat; startLng = lng;
+    });
+    document.addEventListener('mousemove', e => {
+      if (!State.touchMove || !overlay || !mouseStart || activeHandle) return;
+      e.preventDefault();
+      const p = map.latLngToContainerPoint([startLat, startLng]);
+      const nl = map.containerPointToLatLng(L.point(p.x + (e.clientX - mouseStart.x), p.y + (e.clientY - mouseStart.y)));
+      lat = nl.lat; lng = nl.lng;
+      render();
+    });
+    document.addEventListener('mouseup', () => { mouseStart = null; });
+    mc.addEventListener('wheel', e => {
+      if (!State.touchMove || !overlay) return;
+      e.preventDefault();
+      if (e.deltaY < 0) { w *= 1.03; h *= 1.03; } else { w *= 0.97; h *= 0.97; }
+      render();
+    }, { passive: false });
     
     return { adjust, remove, toggleTouch, openStepSlider, getGeoRef: () => overlay ? { lat, lng, w, h, angle } : null, getImageData: () => overlay ? imgData : null };
   })();

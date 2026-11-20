@@ -251,3 +251,23 @@ button.mb-label:active { transform: scale(0.95); }
   text-align: center; font-size: 13px; font-weight: 800; color: #07090e;
   background: var(--saffron); border-radius: 8px; padding: 5px 0; letter-spacing: 0.5px;
 }
+
+/* ── FMB Resize Handles (MS Office style) ── */
+.fmb-handle {
+  background: transparent !important;
+  border: none !important;
+}
+.fmb-handle-dot {
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  border: 2px solid #FF9933;
+  border-radius: 2px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.45);
+  box-sizing: border-box;
+}
+.fmb-handle-dot:hover {
+  background: #FF9933;
+  border-color: #ffffff;
+  transform: scale(1.15);
+}
