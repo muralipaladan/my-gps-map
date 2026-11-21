@@ -9,7 +9,7 @@
   const KSREC_URL     = 'https://ksrec.in/geoserver/Kerala/wms';
   const DEFAULT_VIEW  = { lat: 11.2270173, lng: 76.2150992, zoom: 17 };
 
-  const State = { drawing: false, eraseMode: false, editMode: false, touchMove: false, routeMode: false, snapEnabled: true, userLatLng: null, activeLayer: 'Hybrid', activeTool: null, notesCount: 0 };
+  const State = { drawing: false, eraseMode: false, editMode: false, touchMove: false, routeMode: false, userLatLng: null, activeLayer: 'Hybrid', activeTool: null, notesCount: 0 };
 
   const Toast = (() => {
     const root = document.getElementById('toast-root');
@@ -206,19 +206,50 @@
     };
 
     map.on('pm:globaldrawmodetoggled', e => { if (!e.enabled) clearHighlights(); });
-    let workingLayerMini = null;
+    let workingLayerMini = null, syncFn = null;
     map.on('pm:drawstart', (e) => {
       State.drawing = true;
       if (e.workingLayer) {
         if (workingLayerMini) mini.removeLayer(workingLayerMini);
         const shape = map.pm.Draw.getActiveShape(), style = { color: '#FF9933', weight: 4, dashArray: '5, 5' };
         if (shape === 'Polygon' || shape === 'Rectangle') workingLayerMini = L.polygon([], style).addTo(mini); else if (shape === 'Line') workingLayerMini = L.polyline([], style).addTo(mini);
-        const syncWorkingLayer = () => { if (workingLayerMini && e.workingLayer.getLatLngs) { try { workingLayerMini.setLatLngs(e.workingLayer.getLatLngs()); } catch (err) {} } };
-        e.workingLayer.on('pm:vertexadded pm:vertexremoved', syncWorkingLayer); map.on('mousemove', syncWorkingLayer);
+        const syncWorkingLayer = () => { if (workingLayerMini && e.workingLayer.getLatLngs) { try { workingLayerMini.setLatLngs(e.workingLayer.getLatLngs()); } catch (err) {} } liveStatus(e.workingLayer); };
+        e.workingLayer.on('pm:vertexadded pm:vertexremoved', syncWorkingLayer); if (syncFn) map.off('mousemove', syncFn); syncFn = syncWorkingLayer; map.on('mousemove', syncWorkingLayer);
       }
     });
-    map.on('pm:drawend', () => { State.drawing = false; if (workingLayerMini) { mini.removeLayer(workingLayerMini); workingLayerMini = null; } });
+    map.on('pm:drawend', () => { State.drawing = false; if (syncFn) { map.off('mousemove', syncFn); syncFn = null; } updateStatus(); if (workingLayerMini) { mini.removeLayer(workingLayerMini); workingLayerMini = null; } });
     
+    // ── Metric measurements (m, km, m², Are, ha) ──
+    const fmtLen = m => m >= 1000 ? `${(m/1000).toFixed(3)} km` : `${m.toFixed(2)} m`;
+    const ringOf = l => { const r = l.getLatLngs(); return Array.isArray(r[0]) ? r[0] : r; };
+    const lenOf = pts => { let t = 0; for (let i = 1; i < pts.length; i++) t += pts[i-1].distanceTo(pts[i]); return t; };
+    const measureHtml = (layer, shape) => {
+      const pts = ringOf(layer);
+      if (shape === 'Line') return `<b>Length</b><br>${fmtLen(lenOf(pts))}`;
+      const a = L.GeometryUtil.geodesicArea(pts);
+      return `<b>Area</b><br>${a.toFixed(2)} m²<br>${(a/100).toFixed(3)} Are<br>${(a/10000).toFixed(4)} ha<br><b>Perimeter</b><br>${fmtLen(lenOf([...pts, pts[0]]))}`;
+    };
+    const liveStatus = wl => { try {
+      const pts = ringOf(wl); if (pts.length < 2) return;
+      document.getElementById('statusText').textContent = map.pm.Draw.getActiveShape() === 'Polygon' && pts.length > 2 ? `${L.GeometryUtil.geodesicArea(pts).toFixed(1)} m²` : fmtLen(lenOf(pts));
+    } catch (err) {} };
+
+    const eraseStack = [];
+    map.on('pm:remove', e => { if (e.layer._gisShape) { eraseStack.push({ shape: e.layer._gisShape, latlngs: e.layer.getLatLngs() }); if (eraseStack.length > 20) eraseStack.shift(); drawnItems.removeLayer(e.layer); } });
+
+    const mkMini = (layer, isLine) => {
+      const st = isLine ? { color:'#FF9933', weight:3 } : { color:'#FF9933', fillColor:'#FF9933', fillOpacity:0.15, weight:2.5 };
+      vectorSync[L.stamp(layer)] = L.stamp((isLine ? L.polyline : L.polygon)(layer.getLatLngs(), st).addTo(drawnItemsMini));
+    };
+    const register = (layer, shape) => {
+      const isLine = shape === 'Line'; layer._gisShape = shape; drawnItems.addLayer(layer);
+      layer.setStyle(isLine ? { color:'#FF9933', weight:3 } : { color:'#FF9933', fillColor:'#FF9933', fillOpacity:0.15, weight:2.5 });
+      const upd = () => { const html = measureHtml(layer, shape); if (layer.getPopup()) layer.setPopupContent(html); else layer.bindPopup(html).openPopup(); };
+      upd(); layer.on('pm:edit pm:markerdrag pm:markerdragend pm:vertexadded pm:vertexremoved', upd);
+      mkMini(layer, isLine);
+      layer.on('pm:edit pm:markerdrag', () => { const ml = drawnItemsMini.getLayer(vectorSync[L.stamp(layer)]); if (ml) ml.setLatLngs(layer.getLatLngs()); });
+    };
+
     map.on('pm:create', e => {
       const { layer, shape } = e;
       if (shape === 'Marker') {
@@ -226,38 +257,24 @@
         if (txt) { savedNotes.push({ lat:layer.getLatLng().lat, lng:layer.getLatLng().lng, text:txt }); localStorage.setItem(STORAGE_KEY, JSON.stringify(savedNotes)); renderNotes(); Toast.show('Note saved', 'ok'); }
         map.removeLayer(layer); document.getElementById('markerBtn')?.classList.remove('on-accent'); State.activeTool=null; updateStatus(); return;
       }
-      drawnItems.addLayer(layer);
-      if (shape === 'Polygon' || shape === 'Rectangle') {
-        layer.setStyle({ color: '#FF9933', fillColor: '#FF9933', fillOpacity: 0.15, weight: 2.5 });
-        const fmtArea = (sqm) => {
-          if (sqm >= 10000) return `${(sqm / 10000).toFixed(4)} ha<br><small>${sqm.toFixed(1)} m²</small>`;
-          return `${sqm.toFixed(1)} m²`;
-        };
-        const updateAreaPopup = () => {
-          const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
-          const popupContent = `<b>Area</b><br>${fmtArea(area)}`;
-          if (layer.getPopup()) layer.setPopupContent(popupContent); else layer.bindPopup(popupContent).openPopup();
-        };
-        updateAreaPopup(); layer.on('pm:edit pm:markerdragend pm:vertexadded pm:vertexremoved', updateAreaPopup);
-      } else if (shape === 'Line') {
-        layer.setStyle({ color: '#FF9933', weight: 3 });
-        const fmtLen = (m) => m >= 1000 ? `${(m/1000).toFixed(3)} km` : `${m.toFixed(2)} m`;
-        const updateLengthPopup = () => {
-          let len = 0;
-          try { len = L.GeometryUtil.length(layer); } catch (e) {
-            const pts = layer.getLatLngs(); for (let i=1;i<pts.length;i++) len += pts[i-1].distanceTo(pts[i]);
-          }
-          const popupContent = `<b>Length</b><br>${fmtLen(len)}`;
-          if (layer.getPopup()) layer.setPopupContent(popupContent); else layer.bindPopup(popupContent).openPopup();
-        };
-        updateLengthPopup(); layer.on('pm:edit pm:markerdragend pm:vertexadded pm:vertexremoved', updateLengthPopup);
-      }
-
-      const origId = L.stamp(layer); const style = { color: '#FF9933', fillColor: '#FF9933', fillOpacity: 0.15, weight: layer.options.weight || 2.5 };
-      let miniL; if (shape === 'Line') miniL = L.polyline(layer.getLatLngs(), { color: '#FF9933', weight: layer.options.weight || 3 }).addTo(drawnItemsMini); else miniL = L.polygon(layer.getLatLngs(), style).addTo(drawnItemsMini);
-      if (miniL) { vectorSync[origId] = L.stamp(miniL); layer.on('pm:edit pm:markerdrag', () => { const ml = drawnItemsMini.getLayer(vectorSync[L.stamp(layer)]); if (ml) ml.setLatLngs(layer.getLatLngs()); }); }
+      register(layer, shape);
       document.getElementById('lineBtn')?.classList.remove('on-accent'); document.getElementById('polygonBtn')?.classList.remove('on-accent'); State.activeTool=null; updateStatus();
     });
+
+    // ── Snap on/off (works mid-drawing too), undo last point, finish, undo erase ──
+    let snapOn = true;
+    const toggleSnap = () => {
+      snapOn = !snapOn; map.pm.setGlobalOptions({ snappable: snapOn });
+      document.getElementById('snapBtn')?.classList.toggle('on-accent', snapOn);
+      Toast.show(`Snap ${snapOn ? 'ON' : 'OFF'}`, snapOn ? 'ok' : 'warn', 1500);
+    };
+    const activeDraw = () => { const sh = map.pm.Draw.getActiveShape(); return sh && map.pm.Draw[sh]; };
+    const undoPoint = () => { const d = activeDraw(); if (d && d._removeLastVertex) d._removeLastVertex(); else Toast.show('Start a line/polygon first', 'info'); };
+    const finish = () => { const d = activeDraw(); if (d && d._finishShape) d._finishShape(); };
+    const undoErase = () => {
+      const st = eraseStack.pop(); if (!st) { Toast.show('Nothing to undo', 'info'); return; }
+      register((st.shape === 'Line' ? L.polyline : L.polygon)(st.latlngs), st.shape); Toast.show('Restored', 'ok');
+    };
 
     drawnItems.on('layerremove', e => { const oid = L.stamp(e.layer); const ml = drawnItemsMini.getLayer(vectorSync[oid]); if (ml) drawnItemsMini.removeLayer(ml); delete vectorSync[oid]; });
 
@@ -277,23 +294,10 @@
 
     const clearAll = async () => {
       const ok = await Modal.confirm('Clear all drawings?'); if (!ok) return;
-      drawnItems.clearLayers(); drawnItemsMini.clearLayers(); Object.keys(vectorSync).forEach(k => delete vectorSync[k]);
+      eraseStack.length = 0; drawnItems.clearLayers(); drawnItemsMini.clearLayers(); Object.keys(vectorSync).forEach(k => delete vectorSync[k]);
       map.eachLayer(l => { if (l.pm && l instanceof L.Path) map.removeLayer(l); });
       if (State.eraseMode) toggleErase(); if (State.editMode) toggleEdit();
       Toast.show('Cleared', 'ok');
-    };
-
-    const toggleSnap = () => {
-      State.snapEnabled = !State.snapEnabled;
-      map.pm.setGlobalOptions({ snappable: State.snapEnabled });
-      const btn = document.getElementById('snapBtn');
-      if (State.snapEnabled) {
-        btn?.classList.add('on-accent');
-        Toast.show('Snap ON', 'ok');
-      } else {
-        btn?.classList.remove('on-accent');
-        Toast.show('Snap OFF', 'info');
-      }
     };
 
     const toggleRouteMode = () => {
@@ -308,127 +312,13 @@
       window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`, '_blank');
     };
 
-    return { trigger, toggleErase, toggleEdit, toggleSnap, clearAll, _deleteNote: i => { savedNotes.splice(i, 1); localStorage.setItem(STORAGE_KEY, JSON.stringify(savedNotes)); renderNotes(); }, toggleRouteMode, navigateExternal };
+    return { trigger, toggleSnap, undoPoint, finish, undoErase, toggleErase, toggleEdit, clearAll, _deleteNote: i => { savedNotes.splice(i, 1); localStorage.setItem(STORAGE_KEY, JSON.stringify(savedNotes)); renderNotes(); }, toggleRouteMode, navigateExternal };
   })();
 
   const FMB = (() => {
-    let overlay = null, overlayMini = null, imgData = '';
+    let overlay = null, overlayMini = null, imgData = '', dims = null;
     let lat = 0, lng = 0, w = 0.0025, h = 0.0025, angle = 0, currentOpacity = 0.6;
     let touchStart = null, pinchDist = 0, pinchCenter = null; let startLat = 0, startLng = 0, startW = 0, startH = 0;
-    let handleGroup = null, handles = {}, activeHandle = null, handleStart = null;
-
-    // MS-Office style resize handles (8 points: 4 corners + 4 sides)
-    const HANDLE_KEYS = ['nw','n','ne','e','se','s','sw','w'];
-    const HANDLE_CURSORS = { nw:'nwse-resize', n:'ns-resize', ne:'nesw-resize', e:'ew-resize', se:'nwse-resize', s:'ns-resize', sw:'nesw-resize', w:'ew-resize' };
-
-    const ensureHandleGroup = () => {
-      if (!handleGroup) {
-        handleGroup = L.layerGroup().addTo(map);
-      }
-    };
-
-    const clearHandles = () => {
-      if (handleGroup) { handleGroup.clearLayers(); handles = {}; }
-    };
-
-    const makeHandleIcon = (key) => L.divIcon({
-      className: 'fmb-handle',
-      html: `<div class="fmb-handle-dot" data-key="${key}" style="cursor:${HANDLE_CURSORS[key]}"></div>`,
-      iconSize: [14, 14],
-      iconAnchor: [7, 7]
-    });
-
-    const getHandleLatLngs = () => {
-      const halfW = w / 2, halfH = h / 2;
-      return {
-        nw: [lat + halfH, lng - halfW],
-        n:  [lat + halfH, lng],
-        ne: [lat + halfH, lng + halfW],
-        e:  [lat,         lng + halfW],
-        se: [lat - halfH, lng + halfW],
-        s:  [lat - halfH, lng],
-        sw: [lat - halfH, lng - halfW],
-        w:  [lat,         lng - halfW]
-      };
-    };
-
-    const updateHandles = () => {
-      if (!imgData || !State.touchMove) { clearHandles(); return; }
-      ensureHandleGroup();
-      const pos = getHandleLatLngs();
-      HANDLE_KEYS.forEach(key => {
-        if (handles[key]) {
-          handles[key].setLatLng(pos[key]);
-        } else {
-          const m = L.marker(pos[key], {
-            icon: makeHandleIcon(key),
-            draggable: true,
-            zIndexOffset: 1000,
-            interactive: true
-          }).addTo(handleGroup);
-          m._handleKey = key;
-          m.on('dragstart', onHandleDragStart);
-          m.on('drag', onHandleDrag);
-          m.on('dragend', onHandleDragEnd);
-          handles[key] = m;
-        }
-      });
-    };
-
-    const onHandleDragStart = (e) => {
-      activeHandle = e.target._handleKey;
-      handleStart = { lat, lng, w, h };
-      map.dragging.disable();
-    };
-
-    const onHandleDrag = (e) => {
-      if (!activeHandle || !handleStart) return;
-      const ll = e.target.getLatLng();
-      const s = handleStart;
-      const key = activeHandle;
-
-      // Opposite side stays fixed (MS Office style)
-      let north = s.lat + s.h / 2;
-      let south = s.lat - s.h / 2;
-      let east  = s.lng + s.w / 2;
-      let west  = s.lng - s.w / 2;
-
-      if (key.includes('n')) north = ll.lat;
-      if (key.includes('s')) south = ll.lat;
-      if (key.includes('e')) east  = ll.lng;
-      if (key.includes('w')) west  = ll.lng;
-
-      // Prevent collapse / flip
-      const minSize = 0.00005;
-      if (north - south < minSize) {
-        if (key.includes('n')) north = south + minSize;
-        else south = north - minSize;
-      }
-      if (east - west < minSize) {
-        if (key.includes('e')) east = west + minSize;
-        else west = east - minSize;
-      }
-
-      lat = (north + south) / 2;
-      lng = (east + west) / 2;
-      h = north - south;
-      w = east - west;
-
-      // Re-render overlay without destroying handles
-      renderOverlayOnly();
-      // Keep other handles in sync
-      const pos = getHandleLatLngs();
-      HANDLE_KEYS.forEach(k => {
-        if (k !== key && handles[k]) handles[k].setLatLng(pos[k]);
-      });
-    };
-
-    const onHandleDragEnd = () => {
-      activeHandle = null;
-      handleStart = null;
-      if (!State.touchMove) map.dragging.enable();
-      render(); // full re-render to keep mini in sync
-    };
 
     document.getElementById('uploadFMB').addEventListener('change', async e => {
       const file = e.target.files[0]; if (!file) return; e.target.value = '';
@@ -436,42 +326,72 @@
         if (file.type === 'application/pdf') {
           const buf = await file.arrayBuffer(); const pdf = await pdfjsLib.getDocument(new Uint8Array(buf)).promise; const page = await pdf.getPage(1);
           const vp = page.getViewport({ scale:2 }); const cvs = Object.assign(document.createElement('canvas'), { width:vp.width, height:vp.height });
-          await page.render({ canvasContext:cvs.getContext('2d'), viewport:vp }).promise; imgData = cvs.toDataURL('image/png');
+          await page.render({ canvasContext:cvs.getContext('2d'), viewport:vp }).promise; imgData = cvs.toDataURL('image/png'); dims = { w:vp.width, h:vp.height };
         } else if (file.type.startsWith('image/')) {
           imgData = await new Promise((res, rej) => { const r = new FileReader(); r.onload = ev => res(ev.target.result); r.onerror = rej; r.readAsDataURL(file); });
         } else { Toast.show('Provide JPG/PNG/PDF', 'warn'); return; }
       } catch (err) { Toast.show(`Error: ${err.message}`, 'error'); return; }
-      const c = map.getCenter(); lat = c.lat; lng = c.lng; angle = 0; w = 0.0025; h = 0.0025;
-      render();
-      GIS.UI.showRibbonPage('fmb'); GIS.UI.openRibbon();
-      if (!State.touchMove) toggleTouch();
-      Toast.show('FMB loaded — drag corners/sides to resize', 'ok');
+      if (!dims || file.type !== 'application/pdf') dims = await new Promise(res => { const im = new Image(); im.onload = () => res({ w:im.naturalWidth, h:im.naturalHeight }); im.onerror = () => res({ w:1, h:1 }); im.src = imgData; });
+      if (overlay) { map.removeLayer(overlay); mini.removeLayer(overlayMini); overlay = overlayMini = null; }
+      const c = map.getCenter(); lat = c.lat; lng = c.lng; angle = 0;
+      const asp = dims.w / dims.h, big = 0.0025 * 111320; // longer side ≈ 278 m, real aspect kept
+      w = (asp >= 1 ? big : big*asp) / (111320 * Math.cos(lat*Math.PI/180)); h = (asp >= 1 ? big/asp : big) / 111320;
+      render(); if (!State.touchMove) toggleTouch();
+      GIS.UI.showRibbonPage('fmb'); GIS.UI.openRibbon(); Toast.show('FMB loaded', 'ok');
     });
 
     const changeOpacity = (val) => { currentOpacity = Math.max(0.1, Math.min(1.0, currentOpacity + val)); if(overlay) overlay.setOpacity(currentOpacity); if(overlayMini) overlayMini.setOpacity(currentOpacity); };
 
-    const renderOverlayOnly = () => {
-      if (!imgData) return;
-      const bounds = L.latLngBounds([lat - h/2, lng - w/2], [lat + h/2, lng + w/2]);
-      if (overlay) map.removeLayer(overlay);
-      const mkSvg = () => {
-        const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('xmlns', ns); svg.setAttribute('viewBox', '0 0 100 100');
-        const img = document.createElementNS(ns, 'image'); img.setAttribute('width','100'); img.setAttribute('height','100'); img.setAttributeNS('http://www.w3.org/1999/xlink','href',imgData); img.setAttribute('href', imgData); img.setAttribute('transform', `rotate(${angle} 50 50)`); svg.appendChild(img); return svg;
-      };
-      overlay = L.svgOverlay(mkSvg(), bounds, { pane:'overlayPane', opacity:currentOpacity, interactive:false }).addTo(map);
+    // Image fills the bounds (no letterbox); viewBox follows the on-screen aspect so rotation never skews.
+    let svgA = null, svgB = null;
+    const mkSvg = () => {
+      const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg'), img = document.createElementNS(ns, 'image');
+      svg.setAttribute('xmlns', ns); svg.setAttribute('preserveAspectRatio', 'none'); svg.style.overflow = 'visible';
+      img.setAttribute('preserveAspectRatio', 'none'); img.setAttribute('href', imgData); img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', imgData);
+      svg.appendChild(img); return { svg, img };
+    };
+    const ratio = () => { const p = map.project([lat + h/2, lng - w/2], 18), q = map.project([lat - h/2, lng + w/2], 18); return Math.abs((q.x - p.x) / (q.y - p.y)) || 1; };
+    const geom = o => { const W = ratio() * 100; o.svg.setAttribute('viewBox', `0 0 ${W} 100`); o.img.setAttribute('width', W); o.img.setAttribute('height', 100); o.img.setAttribute('transform', `rotate(${angle} ${W/2} 50)`); };
+    const render = () => {
+      if (!imgData) return; const bounds = L.latLngBounds([lat - h/2, lng - w/2], [lat + h/2, lng + w/2]);
+      if (!overlay) {
+        svgA = mkSvg(); svgB = mkSvg();
+        overlay = L.svgOverlay(svgA.svg, bounds, { pane:'overlayPane', opacity:currentOpacity, interactive:false }).addTo(map);
+        overlayMini = L.svgOverlay(svgB.svg, bounds, { opacity:currentOpacity, interactive:false }).addTo(mini);
+      } else { overlay.setBounds(bounds); overlayMini.setBounds(bounds); }
+      geom(svgA); geom(svgB); placeHandles();
     };
 
-    const render = () => {
-      if (!imgData) return;
-      const bounds = L.latLngBounds([lat - h/2, lng - w/2], [lat + h/2, lng + w/2]);
-      if (overlay) map.removeLayer(overlay); if (overlayMini) mini.removeLayer(overlayMini);
-      const mkSvg = () => {
-        const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('xmlns', ns); svg.setAttribute('viewBox', '0 0 100 100');
-        const img = document.createElementNS(ns, 'image'); img.setAttribute('width','100'); img.setAttribute('height','100'); img.setAttributeNS('http://www.w3.org/1999/xlink','href',imgData); img.setAttribute('href', imgData); img.setAttribute('transform', `rotate(${angle} 50 50)`); svg.appendChild(img); return svg;
+    // ── MS-Office style handles: corners = proportional, sides = stretch one axis (Shift on corner = free), green dot = rotate ──
+    const hl = document.createElement('div'); hl.id = 'fmbHandles'; document.body.appendChild(hl);
+    const hbox = document.createElement('div'); hbox.className = 'fh-box'; hl.appendChild(hbox);
+    const rot = (x, y, deg) => { const t = deg*Math.PI/180, c = Math.cos(t), s = Math.sin(t); return { x: x*c - y*s, y: x*s + y*c }; };
+    const box = () => { const p = map.latLngToContainerPoint([lat + h/2, lng - w/2]), q = map.latLngToContainerPoint([lat - h/2, lng + w/2]); return { cx:(p.x+q.x)/2, cy:(p.y+q.y)/2, pw:q.x-p.x, ph:q.y-p.y }; };
+    const HD = [['nw',-1,-1],['n',0,-1],['ne',1,-1],['e',1,0],['se',1,1],['s',0,1],['sw',-1,1],['w',-1,0],['rot',0,-2]];
+    const handles = HD.map(([k, sx, sy]) => { const el = document.createElement('div'); el.className = 'fh fh-' + k; hl.appendChild(el); el.addEventListener('pointerdown', e => startDrag(e, el, k, sx, sy)); return { el, sx, sy }; });
+    const placeHandles = () => {
+      const on = State.touchMove && overlay; hl.style.display = on ? 'block' : 'none'; if (!on) return;
+      const { cx, cy, pw, ph } = box(), r = map.getContainer().getBoundingClientRect();
+      Object.assign(hbox.style, { left:(r.left+cx)+'px', top:(r.top+cy)+'px', width:pw+'px', height:ph+'px', transform:`translate(-50%,-50%) rotate(${angle}deg)` });
+      handles.forEach(({ el, sx, sy }) => { const o = rot(sx*pw/2, sy === -2 ? -ph/2 - 30 : sy*ph/2, angle); el.style.left = (r.left+cx+o.x)+'px'; el.style.top = (r.top+cy+o.y)+'px'; });
+    };
+    map.on('move zoom zoomend viewreset resize', placeHandles);
+    const startDrag = (e, el, k, sx, sy) => {
+      e.preventDefault(); e.stopPropagation(); el.setPointerCapture(e.pointerId);
+      const r = map.getContainer().getBoundingClientRect(), g = box(), ang = angle;
+      const o0 = rot(sx*g.pw/2, sy*g.ph/2, ang), A = { x: g.cx - o0.x, y: g.cy - o0.y }; // opposite corner/side stays fixed
+      const move = ev => {
+        const px = ev.clientX - r.left, py = ev.clientY - r.top;
+        if (k === 'rot') { angle = Math.atan2(px - g.cx, -(py - g.cy)) * 180 / Math.PI; if (ev.shiftKey) angle = Math.round(angle/5)*5; render(); return; }
+        const d = rot(px - A.x, py - A.y, -ang);
+        let nw = sx ? Math.max(12, sx*d.x) : g.pw, nh = sy ? Math.max(12, sy*d.y) : g.ph;
+        if (sx && sy && !ev.shiftKey) { const f = Math.max(nw/g.pw, nh/g.ph); nw = g.pw*f; nh = g.ph*f; }
+        const o = rot(sx*nw/2, sy*nh/2, ang), c = { x: A.x + o.x, y: A.y + o.y };
+        const tl = map.containerPointToLatLng([c.x - nw/2, c.y - nh/2]), br = map.containerPointToLatLng([c.x + nw/2, c.y + nh/2]);
+        lat = (tl.lat + br.lat)/2; lng = (tl.lng + br.lng)/2; h = tl.lat - br.lat; w = br.lng - tl.lng; render();
       };
-      overlay = L.svgOverlay(mkSvg(), bounds, { pane:'overlayPane', opacity:currentOpacity, interactive:false }).addTo(map);
-      overlayMini = L.svgOverlay(mkSvg(), bounds, { opacity:currentOpacity, interactive:false }).addTo(mini);
-      updateHandles();
+      const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); };
+      el.addEventListener('pointermove', move); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
     };
 
     // Step values set by the slider panel (MOVE / ZOOM / ROT chips)
@@ -530,25 +450,14 @@
     const remove = async () => {
       if (!overlay) return; const ok = await Modal.confirm('Remove FMB?'); if (!ok) return;
       map.removeLayer(overlay); overlay = null; mini.removeLayer(overlayMini); overlayMini = null; imgData = '';
-      clearHandles();
       if (State.touchMove) toggleTouch(); Toast.show('FMB removed', 'info'); GIS.UI.showRibbonPage('main');
     };
 
     const toggleTouch = () => {
       if (map.pm.GlobalDrawMode) map.pm.disableDraw(); State.touchMove = !State.touchMove; const btn = document.getElementById('touchMoveBtn');
-      if (State.touchMove) {
-        map.dragging.disable(); map.touchZoom.disable();
-        btn?.classList.add('on-accent');
-        State.activeTool = 'ADJUST FMB';
-        Toast.show('Drag image or handles to move/resize', 'info');
-      } else {
-        map.dragging.enable(); map.touchZoom.enable();
-        btn?.classList.remove('on-accent');
-        State.activeTool = null;
-        clearHandles();
-      }
-      updateStatus();
-      updateHandles();
+      if (State.touchMove) { map.dragging.disable(); map.touchZoom.disable(); btn?.classList.add('on-accent'); State.activeTool='MOVE FMB'; } 
+      else { map.dragging.enable(); map.touchZoom.enable(); btn?.classList.remove('on-accent'); State.activeTool=null; }
+      updateStatus(); placeHandles();
     };
 
     const mc = map.getContainer();
@@ -576,29 +485,10 @@
     mc.addEventListener('touchend', () => { touchStart = null; pinchDist = 0; }, { passive:false });
 
     let mouseStart = null;
-    mc.addEventListener('mousedown', e => {
-      if (!State.touchMove || !overlay || e.button !== 0 || activeHandle) return;
-      // Ignore clicks on resize handles
-      if (e.target && (e.target.classList?.contains('fmb-handle-dot') || e.target.closest?.('.fmb-handle'))) return;
-      e.preventDefault();
-      mouseStart = { x: e.clientX, y: e.clientY };
-      startLat = lat; startLng = lng;
-    });
-    document.addEventListener('mousemove', e => {
-      if (!State.touchMove || !overlay || !mouseStart || activeHandle) return;
-      e.preventDefault();
-      const p = map.latLngToContainerPoint([startLat, startLng]);
-      const nl = map.containerPointToLatLng(L.point(p.x + (e.clientX - mouseStart.x), p.y + (e.clientY - mouseStart.y)));
-      lat = nl.lat; lng = nl.lng;
-      render();
-    });
-    document.addEventListener('mouseup', () => { mouseStart = null; });
-    mc.addEventListener('wheel', e => {
-      if (!State.touchMove || !overlay) return;
-      e.preventDefault();
-      if (e.deltaY < 0) { w *= 1.03; h *= 1.03; } else { w *= 0.97; h *= 0.97; }
-      render();
-    }, { passive: false });
+    mc.addEventListener('mousedown', e => { if (!State.touchMove || !overlay || e.button!==0) return; e.preventDefault(); mouseStart = { x:e.clientX, y:e.clientY }; startLat = lat; startLng = lng; });
+    document.addEventListener('mousemove', e => { if (!State.touchMove || !overlay || !mouseStart) return; e.preventDefault(); const p = map.latLngToContainerPoint([startLat, startLng]); const nl = map.containerPointToLatLng(L.point(p.x+(e.clientX-mouseStart.x), p.y+(e.clientY-mouseStart.y))); lat = nl.lat; lng = nl.lng; render(); });
+    document.addEventListener('mouseup', () => mouseStart = null);
+    mc.addEventListener('wheel', e => { if (!State.touchMove || !overlay) return; e.preventDefault(); if (e.deltaY < 0) { w*=1.03; h*=1.03; } else { w*=0.97; h*=0.97; } render(); }, { passive: false });
     
     return { adjust, remove, toggleTouch, openStepSlider, getGeoRef: () => overlay ? { lat, lng, w, h, angle } : null, getImageData: () => overlay ? imgData : null };
   })();

@@ -252,22 +252,12 @@ button.mb-label:active { transform: scale(0.95); }
   background: var(--saffron); border-radius: 8px; padding: 5px 0; letter-spacing: 0.5px;
 }
 
-/* ── FMB Resize Handles (MS Office style) ── */
-.fmb-handle {
-  background: transparent !important;
-  border: none !important;
-}
-.fmb-handle-dot {
-  width: 12px;
-  height: 12px;
-  background: #ffffff;
-  border: 2px solid #FF9933;
-  border-radius: 2px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.45);
-  box-sizing: border-box;
-}
-.fmb-handle-dot:hover {
-  background: #FF9933;
-  border-color: #ffffff;
-  transform: scale(1.15);
-}
+/* FMB resize handles (MS Office style) */
+#fmbHandles { position:fixed; inset:0; z-index:2500; pointer-events:none; display:none; }
+#fmbHandles .fh-box { position:absolute; border:2px dashed var(--saffron); pointer-events:none; }
+#fmbHandles .fh { position:absolute; width:22px; height:22px; margin:-11px 0 0 -11px; background:#fff; border:2.5px solid var(--saffron); border-radius:6px; pointer-events:auto; touch-action:none; box-shadow:0 2px 6px rgba(0,0,0,.5); }
+#fmbHandles .fh-nw, #fmbHandles .fh-se { cursor:nwse-resize; }
+#fmbHandles .fh-ne, #fmbHandles .fh-sw { cursor:nesw-resize; }
+#fmbHandles .fh-n, #fmbHandles .fh-s { cursor:ns-resize; }
+#fmbHandles .fh-e, #fmbHandles .fh-w { cursor:ew-resize; }
+#fmbHandles .fh-rot { border-radius:50%; background:var(--green); border-color:#fff; cursor:grab; }

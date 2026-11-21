@@ -7,7 +7,7 @@
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.20.8/dist/leaflet-geoman.css" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="style.css" />
@@ -78,9 +78,12 @@
     <button class="mb" id="markerBtn" onclick="GIS.Draw.trigger('Marker')"><i class="fa-solid fa-location-dot"></i></button>
     <button class="mb" id="lineBtn" onclick="GIS.Draw.trigger('Line')"><i class="fa-solid fa-slash"></i></button>
     <button class="mb" id="polygonBtn" onclick="GIS.Draw.trigger('Polygon')"><i class="fa-solid fa-draw-polygon"></i></button>
-    <button class="mb" id="editBtn" onclick="GIS.Draw.toggleEdit()"><i class="fa-solid fa-pen-to-square"></i></button>
-    <button class="mb" id="eraseModeBtn" onclick="GIS.Draw.toggleErase()"><i class="fa-solid fa-eraser"></i></button>
     <button class="mb on-accent" id="snapBtn" onclick="GIS.Draw.toggleSnap()" title="Snap On/Off"><i class="fa-solid fa-magnet"></i></button>
+    <button class="mb" onclick="GIS.Draw.undoPoint()" title="Last point delete"><i class="fa-solid fa-delete-left"></i></button>
+    <button class="mb" onclick="GIS.Draw.finish()" title="Finish"><i class="fa-solid fa-check"></i></button>
+    <button class="mb" id="editBtn" onclick="GIS.Draw.toggleEdit()"><i class="fa-solid fa-pen-to-square"></i></button>
+    <button class="mb" id="eraseModeBtn" onclick="GIS.Draw.toggleErase()" title="Erase line/polygon"><i class="fa-solid fa-eraser"></i></button>
+    <button class="mb" onclick="GIS.Draw.undoErase()" title="Undo erase"><i class="fa-solid fa-rotate-left"></i></button>
     <button class="mb" style="color:var(--red);" onclick="GIS.Draw.clearAll()"><i class="fa-solid fa-trash-can"></i></button>
   </div>
 
@@ -88,7 +91,7 @@
   <div class="ribbon-page" id="pageFMB">
     <button class="mb back-btn" onclick="GIS.UI.showRibbonPage('main')" title="Back"><i class="fa-solid fa-arrow-left"></i></button>
     <div class="rb-divider"></div>
-    <button class="mb" id="touchMoveBtn" onclick="GIS.FMB.toggleTouch()" title="Drag / Resize FMB (handles)"><i class="fa-solid fa-hand"></i></button>
+    <button class="mb" id="touchMoveBtn" onclick="GIS.FMB.toggleTouch()" title="FMB edit: drag / resize / rotate"><i class="fa-solid fa-hand"></i></button>
     <div class="rb-divider"></div>
     <button class="mb-label" onclick="GIS.FMB.openStepSlider('move')" title="Move step slider"><i class="fa-solid fa-arrows-up-down-left-right"></i><span>MOVE</span></button>
     <button class="mb-label rot" onclick="GIS.FMB.openStepSlider('rot')" title="Rotation step slider"><i class="fa-solid fa-rotate-right"></i><span>ROT</span></button>
@@ -185,7 +188,7 @@
 <script src="https://unpkg.com/@mapbox/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.20.8/dist/leaflet-geoman.min.js"></script>
 <script src="script.js"></script>
 
 </body>
