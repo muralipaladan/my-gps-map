@@ -261,3 +261,6 @@ button.mb-label:active { transform: scale(0.95); }
 #fmbHandles .fh-n, #fmbHandles .fh-s { cursor:ns-resize; }
 #fmbHandles .fh-e, #fmbHandles .fh-w { cursor:ew-resize; }
 #fmbHandles .fh-rot { border-radius:50%; background:var(--green); border-color:#fff; cursor:grab; }
+
+/* GPS: plugin button hidden, the app's own GPS button drives it */
+.leaflet-control-locate { display:none !important; }

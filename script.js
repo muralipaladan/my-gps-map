@@ -138,48 +138,35 @@
   })();
 
   const GPS = (() => {
-    let active = false, watchId = null, userMarker = null, ring = null, userMarkerMini = null, ringMini = null;
-    let lastAccuracy = Infinity, firstFix = true;
-    const ACCURACY_REJECT_MAX = 100;
-    const ACCURACY_JUMP_RATIO = 2.5;
-    
-    const bluePointIcon = L.divIcon({ 
-      className: 'blue-dot-container', 
-      html: '<div class="blue-dot"></div>', 
-      iconSize: [20, 20], 
-      iconAnchor: [10, 10] 
+    // Leaflet.Locate plugin: blue dot + accuracy circle + heading cone, auto-start, follows until the user pans (like Google Maps)
+    const dotIcon = L.divIcon({ className:'blue-dot-container', html:'<div class="blue-dot"></div>', iconSize:[20,20], iconAnchor:[10,10] });
+    let dotMini = null, ringMini = null, weakShown = false;
+    const locate = L.control.locate({
+      position:'bottomright', setView:'untilPan', flyTo:true, keepCurrentZoomLevel:false, cacheLocation:true, showCompass:true,
+      clickBehavior:{ inView:'stop', outOfView:'setView', inViewNotFollowing:'setView' },
+      locateOptions:{ enableHighAccuracy:true, maximumAge:0, timeout:15000, maxZoom:19 },
+      onLocationError: err => Toast.show('GPS ലഭ്യമല്ല: ' + (err.message || 'സ്ഥാനം കണ്ടെത്താനായില്ല'), 'warn'),
+      onLocationOutsideMapBounds: () => {}
+    }).addTo(map);
+    const box = locate.getContainer(), btn = document.getElementById('gpsBtn'), icon = btn.querySelector('i');
+    const sync = () => {
+      const fol = box.classList.contains('following'), on = fol || box.classList.contains('active') || box.classList.contains('requesting');
+      btn.classList.toggle('on-blue', on);
+      icon.className = 'fa-solid ' + (on && !fol ? 'fa-location-dot' : 'fa-location-crosshairs');
+      if (!on && dotMini) { mini.removeLayer(dotMini); mini.removeLayer(ringMini); dotMini = ringMini = null; weakShown = false; }
+    };
+    new MutationObserver(sync).observe(box, { attributes:true, attributeFilter:['class'] });
+    map.on('locatelocationfound', e => {
+      if (!dotMini) {
+        dotMini = L.marker(e.latlng, { icon:dotIcon, interactive:false }).addTo(mini);
+        ringMini = L.circle(e.latlng, { radius:e.accuracy, color:'#2563eb', weight:1, opacity:.4, fillOpacity:.08, interactive:false }).addTo(mini);
+      } else { dotMini.setLatLng(e.latlng); ringMini.setLatLng(e.latlng).setRadius(e.accuracy); }
+      if (e.accuracy > 100 && !weakShown) { weakShown = true; Toast.show(`GPS സിഗ്നൽ ദുർബലം (±${Math.round(e.accuracy)}m)`, 'warn', 3000); }
     });
-
-    const onLocationUpdate = (position) => {
-      const { latitude:lat, longitude:lng, accuracy } = position.coords;
-      if (accuracy > ACCURACY_REJECT_MAX) { Toast.show(`GPS സിഗ്നൽ ദുർബലം (±${Math.round(accuracy)}m)`, 'warn', 2000); return; }
-      if (!firstFix && accuracy > lastAccuracy * ACCURACY_JUMP_RATIO) return;
-      lastAccuracy = accuracy; firstFix = false;
-      const latlng = L.latLng(lat, lng); State.userLatLng = latlng; map.panTo(latlng);
-      const popupTxt = `±${Math.round(accuracy)}m`;
-      if (!userMarker) {
-        userMarker = L.marker(latlng, { icon: bluePointIcon }).addTo(map).bindPopup(popupTxt);
-        ring = L.circle(latlng, { radius:accuracy, color:'#2563eb', weight:1, opacity:.4, fillOpacity:.08 }).addTo(map);
-        userMarkerMini = L.marker(latlng, { icon: bluePointIcon }).addTo(mini); 
-        ringMini = L.circle(latlng, { radius:accuracy, color:'#2563eb', weight:1, opacity:.4, fillOpacity:.08 }).addTo(mini);
-      } else {
-        userMarker.setLatLng(latlng); userMarker.setPopupContent(popupTxt); ring.setLatLng(latlng).setRadius(accuracy);
-        userMarkerMini.setLatLng(latlng); ringMini.setLatLng(latlng).setRadius(accuracy);
-      }
-    };
-    const onLocationError = (err) => { Toast.show('GPS ലഭ്യമല്ല: ' + (err.message || 'സ്ഥാനം കണ്ടെത്താനായില്ല'), 'warn'); };
-    const start = () => {
-      if (!navigator.geolocation) { Toast.show('GPS ഈ ഉപകരണത്തിൽ ലഭ്യമല്ല', 'warn'); return; }
-      lastAccuracy = Infinity; firstFix = true;
-      watchId = navigator.geolocation.watchPosition(onLocationUpdate, onLocationError, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-    };
-    const stop = () => { if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; } if (userMarker) { map.removeLayer(userMarker); map.removeLayer(ring); mini.removeLayer(userMarkerMini); mini.removeLayer(ringMini); userMarker=null; ring=null; userMarkerMini=null; ringMini=null; } };
-    const toggle = () => {
-      const btn = document.getElementById('gpsBtn');
-      if (!active) { active = true; btn.classList.add('on-blue'); start(); Toast.show('GPS Active', 'ok'); }
-      else { active = false; btn.classList.remove('on-blue'); stop(); Toast.show('GPS Stopped', 'info'); }
-    };
-    return { toggle };
+    const toggle = () => box.querySelector('a').click();           // tap: start / re-centre / stop
+    const stopFollow = () => { if (box.classList.contains('following')) locate.stopFollowing(); };
+    locate.start();                                                  // auto-start on page load
+    return { toggle, stopFollow };
   })();
 
   const Draw = (() => {
@@ -455,7 +442,7 @@
 
     const toggleTouch = () => {
       if (map.pm.GlobalDrawMode) map.pm.disableDraw(); State.touchMove = !State.touchMove; const btn = document.getElementById('touchMoveBtn');
-      if (State.touchMove) { map.dragging.disable(); map.touchZoom.disable(); btn?.classList.add('on-accent'); State.activeTool='MOVE FMB'; } 
+      if (State.touchMove) { map.dragging.disable(); map.touchZoom.disable(); btn?.classList.add('on-accent'); State.activeTool='MOVE FMB'; GPS.stopFollow(); } 
       else { map.dragging.enable(); map.touchZoom.enable(); btn?.classList.remove('on-accent'); State.activeTool=null; }
       updateStatus(); placeHandles();
     };
