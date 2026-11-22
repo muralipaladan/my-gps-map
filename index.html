@@ -154,6 +154,9 @@
 
 <!-- BOTTOM RIGHT CONTROLS -->
 <div class="fab-stack">
+  <button class="fab-pill icon-only" id="installBtn" title="Install app / Create shortcut">
+    <i class="fa-solid fa-download"></i>
+  </button>
   <button class="fab-pill icon-only" onclick="document.getElementById('exportMenu').classList.toggle('active')" title="ഫീൽഡ് റിപ്പോർട്ട്">
     <i class="fa-solid fa-folder"></i>
   </button>
@@ -196,6 +199,17 @@
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.20.8/dist/leaflet-geoman.min.js"></script>
 <script src="script.js"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+<script>
+// "Install app" button: real install prompt when Chrome allows it, otherwise shows the manual steps
+let installEv = null; const ib = document.getElementById('installBtn');
+if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) ib.style.display = 'none';
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEv = e; });
+addEventListener('appinstalled', () => { ib.style.display = 'none'; installEv = null; });
+ib.onclick = async () => {
+  if (installEv) { installEv.prompt(); await installEv.userChoice; installEv = null; }
+  else alert('Chrome menu (⋮) → "Install app" അല്ലെങ്കിൽ "Add to Home screen" തിരഞ്ഞെടുക്കുക.\niPhone: Share → Add to Home Screen.');
+};
+</script>
 
 </body>
 </html>
